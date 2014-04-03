@@ -1,0 +1,52 @@
+ 
+ This repository contains set of simple (geo-)image processing tools. 
+
+ The tools are primarily build on Python GDAL/OGR and Numpy modules. 
+
+ I hope you'll find some of them usefull. 
+
+ List of Files: 
+
+    img_block.py        shared python module (raster processing) 
+    extract_mask.py     data/no-data mask extractor 
+    extract_mask2.py	data/no-data mask extractor (2 no-data values)
+    find_subset.py	    calculates offset and size of image
+                        subset containing the data and 
+                        cropping out the no-data borders
+    extract_subset.py	extract image subset 
+    smooth_mask.py	    this tool applies Gaussian blur and 
+                        thresholding to smooth mask borders
+    extract_footprint.py extract footprint from raster image (mask) 
+    clip_to_mask.py	    sets masked pixels as no-data
+    create_tiff.py	    creates empty tiff from a master (master
+                        defines pixel size and geocoding, type 
+                        and band count is arbitrary) - possible use
+                        start image for gdal rasterization. 
+    extract_bit_mask.py Extract bit flag as 'byte' mask from 
+                        a flag (multi-mask) image. 
+
+    get_gdaladdo_levels.py propose 'gdaladdo' overview levels 
+
+    get_histogram.py	calculate image bands' histograms (linear of dB-scale)
+    range_stretch.py	image bands' ranges stretching (linear of dB-scale)
+
+
+    img_geom.py		    shared python module (vector processing) 
+    mgrs.py		        shared utilities handling MGRS locations
+    utm.py		        shared UTM utilities 
+
+    eoxs_wkt_footprint.py extract footprint from a geo-referenceable
+                        DS (requires EOxServer/reftools)
+
+    geom_info.py            print information about the input geometry  
+    geom_cut_to_mgrs_grid.py get list of MGR 100km squares covering the geometry  
+    geom_raster_extent.py   get raster image extent as a rectange (polygon)
+    geom_raster_outline.py  get outline of raster feature as a (multi)polygon
+    geom_rasterize.py       rasterize geometry to an existing image
+    geom_ctrans.py          peform coordinate transformation of the input gemometry
+                            optionally including proper date-line wrapping 
+    geom_buffer.py          bufffer geometry
+    geom_simplify.py        simplify geometry 
+    geom_segmentize.py      segmentize geometry 
+    geom_union.py           unite multiple geometries 
+    geom_insect.py          intersect multiple geometries 
