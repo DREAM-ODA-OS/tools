@@ -89,7 +89,7 @@ if __name__ == "__main__" :
     r = ogr.Geometry( ogr.wkbLinearRing ) 
     
     for x,y in ((0,0),(imi.sx,0),(imi.sx,imi.sy),(0,imi.sy)) :
-        r.AddPoint( x0+dxx*x+dxy*y , y0+dyx*x+dyy*y ) 
+        r.AddPoint_2D( x0+dxx*x+dxy*y , y0+dyx*x+dyy*y ) 
 
     r.CloseRings()
 
