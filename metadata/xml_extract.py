@@ -48,6 +48,7 @@ if __name__ == "__main__":
     ATTRIB = None 
     TEXT = False 
     GML = False 
+    TAG = False 
 
     try: 
         XML = sys.argv[1]
@@ -58,6 +59,7 @@ if __name__ == "__main__":
             elif (arg == "PRETTY"): PRETTY = True # pretty XML print 
             elif (arg == "TEXT"): TEXT = True # pretty XML print 
             elif (arg == "GML"): GML = True # pretty XML print 
+            elif (arg == "TAG"): TAG = True # pretty XML print 
 
     except IndexError: 
         sys.stderr.write("ERROR: %s: Not enough input arguments!\n"%EXENAME) 
@@ -72,6 +74,7 @@ if __name__ == "__main__":
         print >>sys.stderr, "TEXT:        ", TEXT
         print >>sys.stderr, "PRETTY:      ", PRETTY
         print >>sys.stderr, "ATTRIB:      ", ATTRIB
+        print >>sys.stderr, "TAG:         ", TAG
 
 #------------------------------------------------------------------------------
 
@@ -86,7 +89,9 @@ if __name__ == "__main__":
         print >>sys.stderr, "ERROR: %s: Element not found!"%EXENAME
         sys.exit(1) 
 
-    if ATTRIB: # extract text
+    if TAG:
+        sys.stdout.write(elm.tag)
+    elif ATTRIB: # extract text
         sys.stdout.write(elm.get(ATTRIB,""))  
     elif TEXT: # extract text
         sys.stdout.write(elm.text)  
