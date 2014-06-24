@@ -32,40 +32,34 @@ import sys
 import re 
 import os.path 
 from lxml import etree as et
-
 import ns_ogr 
-
-#------------------------------------------------------------------------------
-
 from geom2gml import fixSRSNames
 
 #------------------------------------------------------------------------------
 
-if __name__ == "__main__" : 
+if __name__ == "__main__": 
 
     # TODO: to improve CLI 
 
-    EXENAME = os.path.basename( sys.argv[0] ) 
+    EXENAME = os.path.basename(sys.argv[0]) 
 
-    DEBUG=False 
-    PRETTY=False
-    TEXT=False 
-    GML=False 
+    DEBUG = False 
+    PRETTY = False
+    ATTRIB = None 
+    TEXT = False 
+    GML = False 
 
     try: 
+        XML = sys.argv[1]
+        XPATH = sys.argv[2]
+        for arg in sys.argv[3:]: 
+            if (arg == "DEBUG"): DEBUG = True # dump debuging output
+            elif arg.startswith("ATTRIB="): ATTRIB = arg.partition('=')[2] # pretty XML print 
+            elif (arg == "PRETTY"): PRETTY = True # pretty XML print 
+            elif (arg == "TEXT"): TEXT = True # pretty XML print 
+            elif (arg == "GML"): GML = True # pretty XML print 
 
-        XML     = sys.argv[1]
-        XPATH   = sys.argv[2]
-
-        NP = 2 
-        for arg in sys.argv[NP:] : 
-            if ( arg == "DEBUG" ) : DEBUG = True # dump debuging output
-            elif ( arg == "PRETTY" ) : PRETTY = True # pretty XML print 
-            elif ( arg == "TEXT" ) : TEXT = True # pretty XML print 
-            elif ( arg == "GML" ) : GML = True # pretty XML print 
-
-    except IndexError : 
-        
+    except IndexError: 
         sys.stderr.write("ERROR: %s: Not enough input arguments!\n"%EXENAME) 
         sys.stderr.write("\nExtract subset of an XML document\n") 
         sys.stderr.write("and dump it to the standard output.\n") 
@@ -73,36 +67,30 @@ if __name__ == "__main__" :
         sys.exit(1) 
 
     if DEBUG: 
-        print >>sys.stderr, "input-xml:   ",XML
-        print >>sys.stderr, "x-path:      ",XPATH 
-        print >>sys.stderr, "TEXT:        ",TEXT
-        print >>sys.stderr, "PRETTY:      ",PRETTY
+        print >>sys.stderr, "input-xml:   ", XML
+        print >>sys.stderr, "x-path:      ", XPATH 
+        print >>sys.stderr, "TEXT:        ", TEXT
+        print >>sys.stderr, "PRETTY:      ", PRETTY
+        print >>sys.stderr, "ATTRIB:      ", ATTRIB
 
 #------------------------------------------------------------------------------
 
-    xml_in = et.parse(XML,et.XMLParser(remove_blank_text=True))  
-
-    try : 
-
-        elm = xml_in.find( XPATH ) 
-
-    except Exception as e : 
-
-        print >>sys.stderr, "ERROR: %s: %s "%( EXENAME, e ) 
+    try: 
+        xml_in = et.parse(XML,et.XMLParser(remove_blank_text=True))  
+        elm = xml_in.find(XPATH) 
+    except Exception as e: 
+        print >>sys.stderr, "ERROR: %s: %s "%(EXENAME, e) 
         sys.exit(1) 
 
-
-    if elm is None : 
+    if elm is None: 
         print >>sys.stderr, "ERROR: %s: Element not found!"%EXENAME
         sys.exit(1) 
 
-    if TEXT : # extract text
-        
-        sys.stdout.write( elm.text )  
-
-    else : # extrac XML subtree 
-
-        if GML : # wrap the GML so that it can be loaded by QGIS 
-            elm = ns_ogr.getFeatureCollection( fixSRSNames( elm ) ) 
-
-        print et.tostring( elm, pretty_print=PRETTY, xml_declaration=True, encoding="utf-8") 
+    if ATTRIB: # extract text
+        sys.stdout.write(elm.get(ATTRIB,""))  
+    elif TEXT: # extract text
+        sys.stdout.write(elm.text)  
+    else: # extrac XML subtree 
+        if GML: # wrap the GML so that it can be loaded by QGIS 
+            elm = ns_ogr.getFeatureCollection(fixSRSNames(elm)) 
+        print et.tostring(elm, pretty_print=PRETTY, xml_declaration=True, encoding="utf-8") 
