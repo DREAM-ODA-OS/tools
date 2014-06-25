@@ -86,6 +86,8 @@ if __name__ == "__main__":
         print >>sys.stderr, "MULTI:       ", MULTI
 
 #------------------------------------------------------------------------------
+    if XML == "-":
+        XML = sys.stdin
 
     if XPATH.endswith("/name()"): # lxml XPATH 1.0 does not support name()
         XPATH = XPATH[0:-len("/name()")] or "/"
@@ -96,8 +98,8 @@ if __name__ == "__main__":
         #elm = xml_in.find(XPATH)
         etxp_expr = et.ETXPath(XPATH)
         result = etxp_expr(xml_in)
-    except Exception as e:
-        print >>sys.stderr, "ERROR: %s: %s "%(EXENAME, e)
+    except Exception as exc:
+        print >>sys.stderr, "ERROR: %s: %s "%(EXENAME, exc)
         sys.exit(1)
 
     if not isinstance(result, list):
