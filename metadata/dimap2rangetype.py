@@ -34,140 +34,43 @@ import os.path
 import json
 from lxml import etree as et
 
+from profiles.interfaces import ProfileDimap
+from profiles.spot6_ortho import ProfileSpot6Ortho
+from profiles.spot_view import ProfileSpotView
+from profiles.spot_scene_1a import ProfileSpotScene1a
+from profiles.pleiades1_ortho import ProfilePleiades1Ortho
+
 #JSON_OPTS={}
 JSON_OPTS = {'sort_keys': True, 'indent': 4, 'separators': (',', ': ')}
 
-#------------------------------------------------------------------------------
-
-def _tag(elm):
-    return None if elm is None else elm.tag
-
-def _text(elm):
-    return None if elm is None else elm.text
-
-def _attr(elm, key):
-    return None if elm is None else elm.get(key, None)
-
-def _check(val, label):
-    if val is None:
-        raise ValueError("Invalid %s!"%label)
-    return val
-
-#------------------------------------------------------------------------------
-
-class Profile(object):
-    version = None
-    profile = None
-
-    @classmethod
-    def extract(cls, xml):
-        raise NotImplementedError
-
-
-class Profile_SPOTSCENE_1A(Profile):
-    version = "1.1"
-    profile = "SPOTSCENE_1A"
-    gdal_types = {(8, "UNSIGNED"): "Byte",}
-    c_types = {(8, "UNSIGNED"): "uint8",}
-
-    @classmethod
-    def extract(cls, xml):
-        def _extract(elm, path, label=None):
-            return _check(_text(elm.find(path)), label or path)
-        src_type = _extract(xml, "//Source_Information/SOURCE_TYPE", "SOURCE_TYPE")
-        if src_type != "SCENE":
-            raise ValueError("Unknown SOURCE_TYPE '%s'"%src_type)
-        src_id = _extract(xml, "//Source_Information/SOURCE_ID", "SOURCE_ID")
-        nbands = int(_extract(xml, "//Raster_Dimensions/NBANDS", "NBANDS"))
-        nbits = int(_extract(xml, "//Raster_Encoding/NBITS", "NBITS"))
-        dtype = _extract(xml, "//Raster_Encoding/DATA_TYPE", "DATA_TYPE")
-
-        mname = _extract(xml, "//Scene_Source/MISSION", "MISSION")
-        mindex = _extract(xml, "//Scene_Source/MISSION_INDEX", "MISSION_INDEX")
-        iname = _extract(xml, "//Scene_Source/INSTRUMENT", "INSTRUMENT")
-        iindex = _extract(xml, "//Scene_Source/INSTRUMENT_INDEX", "INSTRUMENT_INDEX")
-        scode = _extract(xml, "//Scene_Source/SENSOR_CODE", "SENSOR_CODE")
-
-        base_name = "%s%s:%s%s:%s:%s"%(mname, mindex, iname, iindex, scode, src_id)
-        dtype_str = _check(cls.c_types.get((nbits, dtype)), 'data type')
-        data_type = _check(cls.gdal_types.get((nbits, dtype)), 'data type')
-
-        nilval = []
-        for elm in xml.iterfind("//Image_Display/Special_Value"):
-            svalidx = _extract(elm, "SPECIAL_VALUE_INDEX")
-            svaltext = _extract(elm, "SPECIAL_VALUE_TEXT")
-            if svaltext == 'NODATA':
-                nilval.append((0, {
-                    "reason": "http://www.opengis.net/def/nil/OGC/0/inapplicable",
-                    "value": svalidx,
-                }))
-            elif svaltext == 'SATURATED':
-                nilval.append((1, {
-                    "reason": "http://www.opengis.net/def/nil/OGC/0/AboveDetectionRange",
-                    "value": svalidx,
-                }))
-        # make sure the no-data goes first
-        nilval = [obj for _, obj in sorted(nilval)]
-
-        bands = []
-        for elm in xml.iterfind("//Spectral_Band_Info"):
-            bname = _extract(elm, "BAND_DESCRIPTION")
-            bidx = int(_extract(elm, "BAND_INDEX"))
-            bunit = _extract(elm, "PHYSICAL_UNIT")
-            bgain = _extract(elm, "PHYSICAL_GAIN")
-            bbias = _extract(elm, "PHYSICAL_BIAS")
-            cal_date = _extract(elm, "PHYSICAL_CALIBRATION_DATE")
-            bands.append((bidx, {
-                "identifier": "%s:BAND%d:%s:%s"%(base_name, bidx, bname, dtype_str),
-                "name": bname,
-                "description": "\n".join([
-                    "BAND_INDEX: %s"%bidx,
-                    "BAND: %s"%bname,
-                    "PHYSICAL_UNIT: %s"%bunit,
-                    "PHYSICAL_GAIN: %s"%bgain,
-                    "PHYSICAL_BIAS: %s"%bbias,
-                    "PHYSICAL_CALIBRATION_DATE: %s"%cal_date,
-                ]),
-                "definition": "http://www.opengis.net/def/property/OGC/0/Radiance",
-                "data_type": data_type,
-                "gdal_interpretation": "Undefined",
-                "uom": "W.m-2.sr-1.nm-1",
-                "nil_values": nilval,
-            }))
-
-        return {
-            "name": "%s:%d:%s"%(base_name, nbands, dtype_str),
-            "data_type": data_type,
-            "bands": [obj for _, obj in sorted(bands)],
-        }
-
-#------------------------------------------------------------------------------
-
 PROFILES = (
-    Profile_SPOTSCENE_1A,
+    ProfileSpotScene1a, ProfileSpotView,
+    ProfileSpot6Ortho, ProfilePleiades1Ortho,
 )
 
-def main(fname):
+def main(fname, sloppy):
     xml = et.parse(fname, et.XMLParser(remove_blank_text=True))
     profile = get_profile(xml)
-    print json.dumps(profile.extract(xml), **JSON_OPTS)
+    if sloppy:
+        print json.dumps(profile.extract_range_type_sloppy(xml), **JSON_OPTS)
+    else:
+        print json.dumps(profile.extract_range_type(xml), **JSON_OPTS)
 
 def get_profile(xml):
-    root = _tag(xml.find("."))
-    format_ = _text(xml.find("//METADATA_FORMAT"))
-    version = _attr(xml.find("//METADATA_FORMAT"), "version")
-    profile = _text(xml.find("//METADATA_PROFILE"))
-    if root != "Dimap_Document" or format_ != "DIMAP":
-        raise ValueError("Not a DIMAP XML document!")
     for item in PROFILES:
-        if item.version == version and item.profile == profile:
+        if item.check_profile(xml):
             return item
-    raise ValueError("Unsupported %s version %s profile '%s'!"%(format_, version, profile))
+    prf = ProfileDimap.get_dimap_profile(xml)
+    if prf is None:
+        raise ValueError("Not a DIMAP XML document!")
+    profile, version = prf
+    raise ValueError("Unsupported DIMAP version %s profile '%s'!"%(version, profile))
 
 #------------------------------------------------------------------------------
 
 if __name__ == "__main__":
     EXENAME = os.path.basename(sys.argv[0])
+    SLOPPY = False
     DEBUG = False
 
     try:
@@ -175,6 +78,8 @@ if __name__ == "__main__":
         for arg in sys.argv[2:]:
             if arg == "DEBUG":
                 DEBUG = True # dump debuging output
+            elif arg == "SLOPPY":
+                SLOPPY = True # dump debuging output
 
     except IndexError:
         print >>sys.stderr, "ERROR: %s: Not enough input arguments!"%EXENAME
@@ -182,14 +87,14 @@ if __name__ == "__main__":
         print >>sys.stderr, "Extract EOxServer range-type (JSON) from DIMAP"
         print >>sys.stderr, "XML metadata."
         print >>sys.stderr
-        print >>sys.stderr, "USAGE: %s <input-xml> [DEBUG]"%EXENAME
+        print >>sys.stderr, "USAGE: %s <input-xml> [SLOPPY][DEBUG]"%EXENAME
         sys.exit(1)
 
     if DEBUG:
         print >>sys.stderr, "input-xml:   ", XML
 
     try:
-        main(XML)
+        main(XML, SLOPPY)
     except Exception as exc:
         print >>sys.stderr, "ERROR: %s: %s "%(EXENAME, exc)
         if DEBUG:
