@@ -40,7 +40,6 @@ from profiles.spot_view import ProfileSpotView
 from profiles.spot_scene_1a import ProfileSpotScene1a
 from profiles.pleiades1_ortho import ProfilePleiades1Ortho
 
-#JSON_OPTS={}
 JSON_OPTS = {'sort_keys': True, 'indent': 4, 'separators': (',', ': ')}
 
 PROFILES = (
