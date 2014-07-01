@@ -1,8 +1,8 @@
 #------------------------------------------------------------------------------
-# 
-#   geometry utilities 
 #
-# Project: XML Metadata Handling 
+#   geometry utilities
+#
+# Project: XML Metadata Handling
 # Authors: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
@@ -11,8 +11,8 @@
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
-# copies of the Software, and to permit persons to whom the Software is 
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
 #
 # The above copyright notice and this permission notice shall be included in all
@@ -28,99 +28,115 @@
 #-------------------------------------------------------------------------------
 
 import sys
-import math as m 
-import numpy as np 
+import math as m
+import numpy as np
 from osgeo import ogr ; ogr.UseExceptions()
 from osgeo import osr ; osr.UseExceptions()
 
 #-------------------------------------------------------------------------------
-# spatial references 
+# coordinate transformation
+RO = ['readonly']
+WO = ['writeonly', 'allocate']
+
+class CTransform(object):
+
+    def __init__(self, sr_src, sr_dst):
+        self._ct = osr.CoordinateTransformation(sr_src, sr_dst)
+
+    def __call__(self, xarr, yarr):
+        try:
+            if xarr.shape != yarr.shape:
+                raise ValueError("Array shape mismatch!")
+            itr = np.nditer([xarr, yarr, None, None], [], [RO, RO, WO, WO])
+            for x, y, u, v in itr:
+                u[...], v[...], _w = self._ct.TransformPoint(float(x), float(y))
+            return itr.operands[2], itr.operands[3]
+        except AttributeError:
+            return self._ct.TransformPoint(xarr, yarr)[0:2]
+
+#-------------------------------------------------------------------------------
+# spatial references
 
 # the most common spatial references
 
-def createSRFromEPSG( epsg ):
+def createSRFromEPSG(epsg):
     """ Create OSR Spatial Reference from EPSG number code"""
     sr = osr.SpatialReference()
     sr.ImportFromEPSG(epsg)
-    return sr 
+    return sr
 
-OSR_WGS84 = createSRFromEPSG(4326) 
+OSR_WGS84 = createSRFromEPSG(4326)
 
-#def setSR( geom , sr ) : 
+#def setSR(geom, sr):
 #    """Assing spatial reference to a geometry and return it."""
-#    geom.AssignSpatialReference( sr ) 
-#    return geom 
+#    geom.AssignSpatialReference(sr)
+#    return geom
 
-def parseSR( srs , debug = False ) : 
-
-    if debug: print >>sys.stderr, "SRS: ",srs
-
-    if ( srs[:5] == "EPSG:" ) : 
-        sr = createSRFromEPSG( int(srs.split(":")[-1]) ) 
-
-    elif ( srs[:7] == "PROJCS[" ):  
-        sr = osr.SpatialReference( srs ) 
-
-    elif srs in ( None , "" , "NONE" ) : 
-        sr = None 
-
-    else : 
+def parseSR(srs, debug=False):
+    if debug:
+        print >>sys.stderr, "SRS: ", srs
+    if srs[:5] == "EPSG:":
+        sr = createSRFromEPSG(int(srs.split(":")[-1]))
+    elif srs[:7] == "PROJCS[":
+        sr = osr.SpatialReference(srs)
+    elif srs in (None, "", "NONE"):
+        sr = None
+    else:
         raise ValueError("Failed to parse the spatial reference! SRS='%s'"%(srs))
-
-    return sr 
+    return sr
 
 #-------------------------------------------------------------------------------
 
-def dumpSR( sr ): 
-
-    # check whether geometry has a spatial reference 
-    if sr is not None : 
-        an,ac = (sr.GetAuthorityName(None),sr.GetAuthorityCode(None))
-        if an == "EPSG" and ac > 0 : 
-            #out = "%s:%s%s"%( an , ac , delimiter ) 
-            out = "urn:ogc:def:crs:%s::%s"%( an , ac ) 
-        else : 
-            print >>sys.stderr , "WARNING: Unsupported projection! %s"%(sr.ExportToWkt())
+def dumpSR(sr):
+    # check whether geometry has a spatial reference
+    if sr is not None:
+        an, ac = (sr.GetAuthorityName(None), sr.GetAuthorityCode(None))
+        if an == "EPSG" and ac > 0:
+            #out = "%s:%s%s"%(an, ac, delimiter)
+            out = "urn:ogc:def:crs:%s::%s"%(an, ac)
+        else:
+            print >>sys.stderr, "WARNING: Unsupported projection! %s"%(sr.ExportToWkt())
             out = ""
-    else : 
+    else:
         out = ""
-
-    return out 
+    return out
 
 #-------------------------------------------------------------------------------
-# File I/O subroutines  
+# File I/O subroutines
 
-def parseGeom( buf , debug = False ): 
-    """ parse geometry from a source buffer """ 
+def parseGeom(buf, debug=False):
+    """ parse geometry from a source buffer """
+    # parse prefix
+    if buf.startswith("EPSG:") or buf.startswith("PROJCS["):
+        srs, _, buf = buf.partition(';')
+        sr = parseSR(srs)
+    else:
+        sr = None
 
-    # parse prefix 
-    if buf.startswith("EPSG:") or buf.startswith("PROJCS[") :
-        srs , _ , buf  = buf.partition(';')
-        sr = parseSR(srs) 
-    else : 
-        sr = None ; 
-    
-    # create the geometry 
-    for loader in ( ogr.CreateGeometryFromWkb, 
+    # create the geometry
+    for loader in (ogr.CreateGeometryFromWkb,
                     ogr.CreateGeometryFromWkt,
                     ogr.CreateGeometryFromGML,
-                    ogr.CreateGeometryFromJson ) : 
-        try :
-            if debug: print >>sys.stderr, "LOADER: ",loader,
-            geom = loader( buf )  
-        except Exception as e : 
-            if debug: print >>sys.stderr, e 
-            continue 
+                    ogr.CreateGeometryFromJson):
+        try:
+            if debug:
+                print >>sys.stderr, "LOADER: ", loader,
+            geom = loader(buf)
+        except Exception as e:
+            if debug:
+                print >>sys.stderr, e
+            continue
 
-        if debug: print >>sys.stderr, "OK"
-        break 
+        if debug:
+            print >>sys.stderr, "OK"
+        break
 
-    else : 
-        raise ValueError("ERROR: Failed to parse the source geometry!") 
+    else:
+        raise ValueError("ERROR: Failed to parse the source geometry!")
 
-    if sr is not None : 
-        geom.AssignSpatialReference( sr ) 
+    if sr is not None:
+        geom.AssignSpatialReference(sr)
 
-    return geom 
+    return geom
 
 #-------------------------------------------------------------------------------
