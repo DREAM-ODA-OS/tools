@@ -35,10 +35,114 @@ from .common import (
 
 from .interfaces import ProfileDimap
 
+from lxml import etree
+import ns_eop20
+import ns_gml32
+import ns_om20
+import numpy as np
+import geom as ig
+
+class SimplifiedLocationModel(object):
+
+    def __init__(self, elm):
+        lcdir = []
+        for elm_coef in elm.find("./Direct_Location_Model/lc_List"):
+            lcdir.append(float(elm_coef.text))
+        self._lcdir = np.array(lcdir)
+        pcdir = []
+        for elm_coef in elm.find("./Direct_Location_Model/pc_List"):
+            pcdir.append(float(elm_coef.text))
+        self._pcdir = np.array(pcdir)
+        lcrev = []
+        for elm_coef in elm.find("./Reverse_Location_Model/lc_List"):
+            lcrev.append(float(elm_coef.text))
+        self._lcrev = np.array(lcrev)
+        pcrev = []
+        for elm_coef in elm.find("./Reverse_Location_Model/pc_List"):
+            pcrev.append(float(elm_coef.text))
+        self._pcrev = np.array(pcrev)
+
+    def __call__(self, x, y, reverse=False):
+        xy = x * y
+        xx = x * x
+        yy = y * y
+        if reverse:
+            lc, pc = self._lcrev, self._pcrev
+        else:
+            lc, pc = self._lcdir, self._pcdir
+        l = lc[0];     p = pc[0]
+        l += lc[1]*x;  p += pc[1]*x
+        l += lc[2]*y;  p += pc[2]*y
+        l += lc[3]*xy; p += pc[3]*xy
+        l += lc[4]*xx; p += pc[4]*xx
+        l += lc[5]*yy; p += pc[5]*yy
+        return l, p
+
+def get_footprint_and_center(xml, n=10):
+    elm_slm = check(xml.find("//Simplified_Location_Model"), "Simplified_Location_Model")
+    loc_mod = SimplifiedLocationModel(elm_slm)
+
+    #ncol = int(extract(xml, "//Raster_Dimensions/NCOLS"))
+    #nrow = int(extract(xml, "//Raster_Dimensions/NROWS"))
+
+    elm = check(xml.find("//Dataset_Frame/Scene_Center"), 'Scene_Center')
+    lon_cnt = float(extract(elm, "./FRAME_LON"))
+    lat_cnt = float(extract(elm, "./FRAME_LAT"))
+
+    vlist = []
+    xc_, yc_ = 0.0, 0.0
+    for elm in xml.iterfind("//Dataset_Frame/Vertex"):
+        _lon = float(extract(elm, "./FRAME_LON"))
+        _lat = float(extract(elm, "./FRAME_LAT"))
+        _row = float(extract(elm, "./FRAME_ROW"))
+        _col = float(extract(elm, "./FRAME_COL"))
+        vlist.append((_lat, _lon, _row, _col))
+    row, col = [], []
+    for i in xrange(len(vlist)):
+        _, _, r0, c0 = vlist[i]
+        _, _, r1, c1 = vlist[(i+1)%len(vlist)]
+        row.append(np.linspace(r0, r1, n, False))
+        col.append(np.linspace(c0, c1, n, False))
+    lon, lat = loc_mod(np.concatenate(row), np.concatenate(col))
+
+    wkt0 = ",".join("%.9g %.9g"%(x, y) for x, y in np.nditer([lon, lat]))
+    wkt0 = "EPSG:4326;POLYGON((%s, %.9g %.9g))"%(wkt0, lon[0], lat[0])
+    wkt1 = "EPSG:4326;POINT(%.9g %.9g))"%(lon_cnt, lat_cnt)
+    return ig.parseGeom(wkt0), ig.parseGeom(wkt1)
+
+
 class ProfileSpotScene1a(ProfileDimap):
     version = "1.1"
     profile = "SPOTSCENE_1A"
     c_types = {(8, "UNSIGNED"): "uint8",}
+
+    @classmethod
+    def get_identifier(cls, xml):
+        """ get dataset's unique identifier """
+        src_id = extract(xml, "//Source_Information/SOURCE_ID")[:-1]
+        mname = extract(xml, "//Scene_Source/MISSION")
+        mindex = extract(xml, "//Scene_Source/MISSION_INDEX")
+        iname = extract(xml, "//Scene_Source/INSTRUMENT")
+        iindex = extract(xml, "//Scene_Source/INSTRUMENT_INDEX")
+        #scode = extract(xml, "//Scene_Source/SENSOR_CODE")
+        scode = ""
+        for elm in xml.iterfind("//Scene_Source"):
+            scode += extract(elm, "SENSOR_CODE")
+        geom = extract(xml, "//Data_Processing/GEOMETRIC_PROCESSING")
+        return "%s%s:%s%s:%s%s:%s"%(mname, mindex, iname, iindex, src_id, scode, geom)
+
+    @classmethod
+    def get_parent_id(cls, xml):
+        """ get collections's unique identifier """
+        mname = extract(xml, "//Scene_Source/MISSION")
+        mindex = extract(xml, "//Scene_Source/MISSION_INDEX")
+        iname = extract(xml, "//Scene_Source/INSTRUMENT")
+        iindex = extract(xml, "//Scene_Source/INSTRUMENT_INDEX")
+        geom = extract(xml, "//Data_Processing/GEOMETRIC_PROCESSING")
+        scode = ""
+        for elm in xml.iterfind("//Scene_Source"):
+            scode += extract(elm, "SENSOR_CODE")
+        return "%s%s:%s%s:%s:%s"%(mname, mindex, iname, iindex, scode, geom)
 
     @classmethod
     def extract_range_type(cls, xml):
@@ -46,19 +150,10 @@ class ProfileSpotScene1a(ProfileDimap):
         src_type = extract(xml, "//Source_Information/SOURCE_TYPE")
         if src_type != "SCENE":
             raise ValueError("Unknown SOURCE_TYPE '%s'"%src_type)
-        src_id = extract(xml, "//Source_Information/SOURCE_ID")
+        base_name = cls.get_identifier(xml)
         nbands = int(extract(xml, "//Raster_Dimensions/NBANDS"))
         nbits = int(extract(xml, "//Raster_Encoding/NBITS"))
         dtype = extract(xml, "//Raster_Encoding/DATA_TYPE")
-
-        mname = extract(xml, "//Scene_Source/MISSION")
-        mindex = extract(xml, "//Scene_Source/MISSION_INDEX")
-        iname = extract(xml, "//Scene_Source/INSTRUMENT")
-        iindex = extract(xml, "//Scene_Source/INSTRUMENT_INDEX")
-        scode = extract(xml, "//Scene_Source/SENSOR_CODE")
-        geom = extract(xml, "//Data_Processing/GEOMETRIC_PROCESSING")
-
-        base_name = "%s%s:%s%s:%s:%s:%s"%(mname, mindex, iname, iindex, scode, geom, src_id)
         dtype = check(cls.c_types.get((nbits, dtype)), 'data type')
         gdal_dtype = check(GDAL_TYPES.get(dtype), 'data_type')
         ogc_dtype = check(OGC_TYPE_DEFS.get(dtype), 'data_type')
@@ -119,18 +214,10 @@ class ProfileSpotScene1a(ProfileDimap):
         src_type = extract(xml, "//Source_Information/SOURCE_TYPE")
         if src_type != "SCENE":
             raise ValueError("Unknown SOURCE_TYPE '%s'"%src_type)
+        base_name = cls.get_parent_id(xml)
         nbands = int(extract(xml, "//Raster_Dimensions/NBANDS"))
         nbits = int(extract(xml, "//Raster_Encoding/NBITS"))
         dtype = extract(xml, "//Raster_Encoding/DATA_TYPE")
-
-        mname = extract(xml, "//Scene_Source/MISSION")
-        mindex = extract(xml, "//Scene_Source/MISSION_INDEX")
-        iname = extract(xml, "//Scene_Source/INSTRUMENT")
-        iindex = extract(xml, "//Scene_Source/INSTRUMENT_INDEX")
-        scode = extract(xml, "//Scene_Source/SENSOR_CODE")
-        geom = extract(xml, "//Data_Processing/GEOMETRIC_PROCESSING")
-
-        base_name = "%s%s:%s%s:%s:%s"%(mname, mindex, iname, iindex, scode, geom)
         dtype = check(cls.c_types.get((nbits, dtype)), 'data type')
         gdal_dtype = check(GDAL_TYPES.get(dtype), 'data_type')
         ogc_dtype = check(OGC_TYPE_DEFS.get(dtype), 'data_type')
@@ -175,3 +262,81 @@ class ProfileSpotScene1a(ProfileDimap):
             "name": "%s:%d:%s"%(base_name, nbands, dtype),
             "bands": [obj for _, obj in sorted(bands)],
         }
+
+    @classmethod
+    def extract_eop_metadata(cls, xml, ns_eop=None, ns_gml=None):
+        """ Extract range definition applicable to all product
+            of the same type.
+        """
+        ns_eop = ns_eop or ns_eop20
+        ns_gml = ns_gml or ns_gml32
+        EOP = ns_eop.E
+        GML = ns_gml.E
+        OM = ns_om20.E
+
+        time_acq_start = "%sT%sZ"%(extract(xml, "//Scene_Source/IMAGING_DATE"),
+                                   extract(xml, "//Scene_Source/IMAGING_TIME"))
+        time_acq_stop = time_acq_start
+        time_prod = extract(xml, "//Production/DATASET_PRODUCTION_DATE")+'Z'
+
+        grid_reference = extract(xml, "//Scene_Source/GRID_REFERENCE")
+        grid_ref_lon = grid_reference[0:3]
+        grid_ref_lat = grid_reference[3:6]
+
+        footprint, center = get_footprint_and_center(xml)
+
+        eo_equipment = EOP.EarthObservationEquipment(
+            ns_gml.getRandomId(),
+            EOP.platform(EOP.Platform(
+                EOP.shortName(extract(xml, "//Scene_Source/MISSION")),
+                EOP.serialIdentifier(extract(xml, "//Scene_Source/MISSION_INDEX")),
+                EOP.orbitType("LEO"),
+            )),
+            EOP.instrument(EOP.Instrument(
+                EOP.shortName("%s%s"%(
+                    extract(xml, "//Scene_Source/INSTRUMENT"),
+                    extract(xml, "//Scene_Source/INSTRUMENT_INDEX"),
+                )),
+            )),
+            EOP.sensor(EOP.Sensor(
+                EOP.sensorType("OPTICAL"),
+            )),
+            EOP.acquisitionParameters(EOP.Acquisition(
+                EOP.orbitNumber(extract(xml, "//Imaging_Parameters/REVOLUTION_NUMBER")),
+                EOP.lastOrbitNumber(extract(xml, "//Imaging_Parameters/REVOLUTION_NUMBER")),
+                EOP.orbitDirection("DESCENDING"),
+                EOP.wrsLongitudeGrid(grid_ref_lon),
+                EOP.wrsLatitudeGrid(grid_ref_lat),
+                EOP.illuminationAzimuthAngle(extract(xml, "//Scene_Source/SUN_AZIMUTH"), {"uom": "deg"}),
+                EOP.illuminationElevationAngle(extract(xml, "//Scene_Source/SUN_ELEVATION"), {"uom": "deg"}),
+                EOP.incidenceAngle(extract(xml, "//Scene_Source/INCIDENCE_ANGLE"), {"uom": "deg"}),
+            )),
+        )
+
+        metadata = EOP.EarthObservationMetaData(
+            EOP.identifier(cls.get_identifier(xml)),
+            EOP.parentIdentifier(cls.get_parent_id(xml)),
+            EOP.acquisitionType("NOMINAL"),
+            EOP.productType("IMAGE"),
+            EOP.status("ACQUIRED"),
+        )
+
+        xml_eop = etree.ElementTree(EOP.EarthObservation(
+            ns_gml.getRandomId(),
+            ns_eop.getSchemaLocation("OPT"),
+            #EOP.parameter(), #optional
+            OM.phenomenonTime(ns_gml.getTimePeriod(time_acq_start, time_acq_stop)),
+            #OM.resultQuality(), #optional
+            OM.resultTime(ns_gml.getTimeInstant(time_prod)),
+            #OM.validTime(), # optional
+            OM.procedure(eo_equipment),
+            OM.observedProperty({"nillReason": "unknown"}),
+            OM.featureOfInterest(
+                ns_eop.getFootprint(*get_footprint_and_center(xml))
+            ),
+            OM.result(ns_gml.getRandomId()),
+            EOP.metaDataProperty(metadata),
+        ))
+
+        xml_eop.getroot().addprevious(ns_eop.getSchematronPI())
+        return xml_eop

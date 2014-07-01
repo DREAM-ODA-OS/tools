@@ -35,8 +35,19 @@ from .common import (
 class Profile(object):
 
     @classmethod
+    def get_identifier(cls, xml):
+        """ get dataset's unique identifier """
+        raise NotImplementedError
+
+    @classmethod
+    def get_parent_id(cls, xml):
+        """ get collections's unique identifier """
+        raise NotImplementedError
+
+    @classmethod
     def check_profile(cls, xml):
         """ check whether the profile is applicable"""
+        raise NotImplementedError
 
     @classmethod
     def extract_range_type(cls, xml):
@@ -51,7 +62,7 @@ class Profile(object):
         raise NotImplementedError
 
     @classmethod
-    def extract_eop_metadata(cls, xml):
+    def extract_eop_metadata(cls, xml, ns_eop=None, ns_gml=None):
         """ Extract range definition applicable to all product
             of the same type.
         """
