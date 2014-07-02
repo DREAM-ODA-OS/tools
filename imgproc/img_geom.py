@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #-------------------------------------------------------------------------------
 #
 #  Vector Geometry Manipulations
@@ -28,11 +27,16 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
+import re
 import sys
 import math as m
 import numpy as np
 from osgeo import ogr ; ogr.UseExceptions()
 from osgeo import osr ; osr.UseExceptions()
+
+_gerexURL = re.compile(r"^http://www.opengis.net/def/crs/epsg/\d+\.?\d*/(\d+)$", re.IGNORECASE)
+_gerexURN = re.compile(r"^urn:ogc:def:crs:epsg:\d*\.?\d*:(\d+)$", re.IGNORECASE)
+_gerexShortCode = re.compile(r"^epsg:(\d+)$", re.IGNORECASE)
 
 #-------------------------------------------------------------------------------
 # coordinate transformation
@@ -79,19 +83,18 @@ def setSR(geom, sr):
     geom.AssignSpatialReference(sr)
     return geom
 
-
 def parseSR(srs, debug=False):
     if debug:
         print >>sys.stderr, "SRS: ", srs
-    if srs[:5] == "EPSG:":
-        sr = createSRFromEPSG(int(srs.split(":")[-1]))
-    elif srs[:7] == "PROJCS[":
-        sr = osr.SpatialReference(srs)
-    elif srs in (None, "", "NONE"):
-        sr = None
-    else:
-        raise ValueError("Failed to parse the spatial reference! SRS='%s'"%(srs))
-    return sr
+    for regex in (_gerexShortCode, _gerexURN, _gerexURL):
+        match = regex.match(srs)
+        if match is not None:
+            return createSRFromEPSG(int(match.group(1)))
+    if srs[:7] == "PROJCS[":
+        return osr.SpatialReference(srs)
+    if srs in (None, "", "NONE"):
+        return None
+    raise ValueError("Failed to parse the spatial reference! SRS='%s'"%(srs))
 
 
 def dumpSR(sr, delimiter="", debug=False):
