@@ -30,6 +30,7 @@
 from lxml import etree
 from lxml.builder import ElementMaker
 from xml_utils import nn
+import geom as ig
 
 import ns_om20 as om
 import ns_ows20 as ows
@@ -188,6 +189,8 @@ def getMask( type, format, srs=None, geom=None, url=None, post=None, subtype=Non
         E.format( format ) ,
     ]
 
+    if srs is None and geom and geom.GetSpatialReference():
+        srs = ig.dumpSR(geom.GetSpatialReference())
     if subtype :
         tmp.append(E.subType(subtype))
     if srs  :
