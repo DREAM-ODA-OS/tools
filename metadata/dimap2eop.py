@@ -43,13 +43,13 @@ XML_OPTS = {'pretty_print': True, 'xml_declaration': True, 'encoding': 'utf-8'}
 
 PROFILES = (
     ProfileSpotScene1a, ProfileSpotView,
-    #ProfileSpot6Ortho, ProfilePleiades1Ortho,
+    ProfileSpot6Ortho, ProfilePleiades1Ortho,
 )
 
 def main(fname):
     xml = et.parse(fname, et.XMLParser(remove_blank_text=True))
     profile = get_profile(xml)
-    print et.tostring(profile.extract_eop_metadata(xml), **XML_OPTS)
+    print et.tostring(profile.extract_eop_metadata(xml, file_name=fname), **XML_OPTS)
 
 def get_profile(xml):
     for item in PROFILES:

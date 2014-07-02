@@ -36,9 +36,7 @@ from .common import (
 from .interfaces import ProfileDimap
 
 from lxml import etree
-import ns_eop20
-import ns_gml32
-import ns_om20
+import ns_opt20
 import numpy as np
 import geom as ig
 
@@ -90,7 +88,6 @@ def get_footprint_and_center(xml, n=10):
     lat_cnt = float(extract(elm, "./FRAME_LAT"))
 
     vlist = []
-    xc_, yc_ = 0.0, 0.0
     for elm in xml.iterfind("//Dataset_Frame/Vertex"):
         _lon = float(extract(elm, "./FRAME_LON"))
         _lat = float(extract(elm, "./FRAME_LAT"))
@@ -264,15 +261,18 @@ class ProfileSpotScene1a(ProfileDimap):
         }
 
     @classmethod
-    def extract_eop_metadata(cls, xml, ns_eop=None, ns_gml=None):
+    def extract_eop_metadata(cls, xml, ns_opt=None, **kwarg):
         """ Extract range definition applicable to all product
             of the same type.
         """
-        ns_eop = ns_eop or ns_eop20
-        ns_gml = ns_gml or ns_gml32
+        ns_opt = ns_opt or ns_opt20
+        ns_eop = ns_opt.ns_eop
+        ns_gml = ns_opt.ns_gml
+        ns_om = ns_opt.ns_om
+        OPT = ns_opt.E
         EOP = ns_eop.E
-        GML = ns_gml.E
-        OM = ns_om20.E
+        OM = ns_om.E
+        #GML = ns_gml.E
 
         time_acq_start = "%sT%sZ"%(extract(xml, "//Scene_Source/IMAGING_DATE"),
                                    extract(xml, "//Scene_Source/IMAGING_TIME"))
@@ -282,8 +282,6 @@ class ProfileSpotScene1a(ProfileDimap):
         grid_reference = extract(xml, "//Scene_Source/GRID_REFERENCE")
         grid_ref_lon = grid_reference[0:3]
         grid_ref_lat = grid_reference[3:6]
-
-        footprint, center = get_footprint_and_center(xml)
 
         eo_equipment = EOP.EarthObservationEquipment(
             ns_gml.getRandomId(),
@@ -321,7 +319,7 @@ class ProfileSpotScene1a(ProfileDimap):
             EOP.status("ACQUIRED"),
         )
 
-        xml_eop = etree.ElementTree(EOP.EarthObservation(
+        xml_eop = OPT.EarthObservation(
             ns_gml.getRandomId(),
             ns_eop.getSchemaLocation("OPT"),
             #EOP.parameter(), #optional
@@ -334,9 +332,10 @@ class ProfileSpotScene1a(ProfileDimap):
             OM.featureOfInterest(
                 ns_eop.getFootprint(*get_footprint_and_center(xml))
             ),
-            OM.result(ns_gml.getRandomId()),
+            OM.result(OPT.EarthObservationResult(ns_gml.getRandomId())),
             EOP.metaDataProperty(metadata),
-        ))
+        )
 
+        xml_eop = etree.ElementTree(xml_eop)
         xml_eop.getroot().addprevious(ns_eop.getSchematronPI())
         return xml_eop

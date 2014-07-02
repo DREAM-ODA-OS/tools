@@ -58,3 +58,5 @@ def check(val, label):
 def extract(elm, path, label=None):
     return check(text(elm.find(path)), label or os.path.basename(path))
 
+def extattr(elm, path, key, label=None):
+    return check(attr(elm.find(path), key), label or os.path.basename(path))

@@ -62,7 +62,7 @@ class Profile(object):
         raise NotImplementedError
 
     @classmethod
-    def extract_eop_metadata(cls, xml, ns_eop=None, ns_gml=None):
+    def extract_eop_metadata(cls, xml, **kwarg):
         """ Extract range definition applicable to all product
             of the same type.
         """

@@ -35,9 +35,7 @@ from .common import (
 
 from .interfaces import ProfileDimap
 from lxml import etree
-import ns_eop20
-import ns_gml32
-import ns_om20
+import ns_opt20
 import numpy as np
 import geom as ig
 
@@ -105,11 +103,10 @@ class ProfileSpotView(ProfileDimap):
         src_type = extract(xml, "//Source_Information/SOURCE_TYPE")
         if src_type != "SCENE":
             raise ValueError("Unknown SOURCE_TYPE '%s'"%src_type)
+        base_name = cls.get_identifier(xml)
         nbands = int(extract(xml, "//Raster_Dimensions/NBANDS"))
         nbits = int(extract(xml, "//Raster_Encoding/NBITS"))
         dtype = extract(xml, "//Raster_Encoding/DATA_TYPE")
-
-        base_name = cls.get_identifier(xml)
         dtype = check(cls.c_types.get((nbits, dtype)), 'data type')
         gdal_dtype = check(GDAL_TYPES.get(dtype), 'data_type')
         ogc_dtype = check(OGC_TYPE_DEFS.get(dtype), 'data_type')
@@ -164,18 +161,10 @@ class ProfileSpotView(ProfileDimap):
         src_type = extract(xml, "//Source_Information/SOURCE_TYPE")
         if src_type != "SCENE":
             raise ValueError("Unknown SOURCE_TYPE '%s'"%src_type)
+        base_name = get_parent_id(xml)
         nbands = int(extract(xml, "//Raster_Dimensions/NBANDS"))
         nbits = int(extract(xml, "//Raster_Encoding/NBITS"))
         dtype = extract(xml, "//Raster_Encoding/DATA_TYPE")
-
-        mname = extract(xml, "//Scene_Source/MISSION")
-        mindex = extract(xml, "//Scene_Source/MISSION_INDEX")
-        iname = extract(xml, "//Scene_Source/INSTRUMENT")
-        iindex = extract(xml, "//Scene_Source/INSTRUMENT_INDEX")
-        scode = extract(xml, "//Data_Processing/SPECTRAL_PROCESSING")
-        geom = extract(xml, "//Data_Processing/GEOMETRIC_PROCESSING")
-
-        base_name = "%s%s:%s%s:%s:%s"%(mname, mindex, iname, iindex, scode, geom)
         dtype = check(cls.c_types.get((nbits, dtype)), 'data type')
         gdal_dtype = check(GDAL_TYPES.get(dtype), 'data_type')
         ogc_dtype = check(OGC_TYPE_DEFS.get(dtype), 'data_type')
@@ -217,15 +206,18 @@ class ProfileSpotView(ProfileDimap):
         }
 
     @classmethod
-    def extract_eop_metadata(cls, xml, ns_eop=None, ns_gml=None):
+    def extract_eop_metadata(cls, xml, ns_opt=None, **kwarg):
         """ Extract range definition applicable to all product
             of the same type.
         """
-        ns_eop = ns_eop or ns_eop20
-        ns_gml = ns_gml or ns_gml32
+        ns_opt = ns_opt or ns_opt20
+        ns_eop = ns_opt.ns_eop
+        ns_gml = ns_opt.ns_gml
+        ns_om = ns_opt.ns_om
+        OPT = ns_opt.E
         EOP = ns_eop.E
-        GML = ns_gml.E
-        OM = ns_om20.E
+        OM = ns_om.E
+        #GML = ns_gml.E
 
         time_acq_start = "%sT%sZ"%(extract(xml, "//Scene_Source/IMAGING_DATE"),
                                    extract(xml, "//Scene_Source/IMAGING_TIME"))
@@ -273,7 +265,7 @@ class ProfileSpotView(ProfileDimap):
             EOP.status("ACQUIRED"),
         )
 
-        xml_eop = etree.ElementTree(EOP.EarthObservation(
+        xml_eop = OPT.EarthObservation(
             ns_gml.getRandomId(),
             ns_eop.getSchemaLocation("OPT"),
             #EOP.parameter(), #optional
@@ -286,9 +278,10 @@ class ProfileSpotView(ProfileDimap):
             OM.featureOfInterest(
                 ns_eop.getFootprint(*get_footprint_and_center(xml))
             ),
-            OM.result(ns_gml.getRandomId()),
+            OM.result(OPT.EarthObservationResult(ns_gml.getRandomId())),
             EOP.metaDataProperty(metadata),
-        ))
+        )
 
+        xml_eop = etree.ElementTree(xml_eop)
         xml_eop.getroot().addprevious(ns_eop.getSchematronPI())
         return xml_eop
