@@ -3,7 +3,7 @@
 #
 #   Extract O&M-EOP metadata document.
 #
-# Project: XML Metadata Handling
+# Project: EO Metadata Handling
 # Authors: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
