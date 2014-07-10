@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #------------------------------------------------------------------------------
 #
-#   QuickBird metadata parser and converter - CLI tool.
+#   Ikonos metadata parser and converter - CLI tool.
 #
 # Project: EO Metadata Handling
 # Authors: Martin Paces <martin.paces@eox.at>
@@ -32,7 +32,7 @@ import os.path
 import sys
 import traceback
 from lxml import etree
-from profiles.quickbird_parser import load_as_xml
+from profiles.ikonos_parser import load_as_xml
 
 XML_OPTS = {'pretty_print': True, 'xml_declaration': True, 'encoding': 'utf-8'}
 
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     except IndexError:
         print >>sys.stderr, "ERROR: %s: Not enough input arguments!"%EXENAME
         print >>sys.stderr
-        print >>sys.stderr, "Convert QuickBird metadata to a simple XML."
+        print >>sys.stderr, "Convert Ikonos metadata to a simple XML."
         print >>sys.stderr
         #print >>sys.stderr, "USAGE: %s <input-xml> [DEBUG][*JSON|XML]"%EXENAME
         print >>sys.stderr, "USAGE: %s <input-xml> [DEBUG]"%EXENAME
@@ -65,3 +65,4 @@ if __name__ == "__main__":
         if DEBUG:
             print >>sys.stderr, traceback.format_exc()
         sys.exit(1)
+
