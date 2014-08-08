@@ -64,7 +64,10 @@ def get_footprint_and_center(xml, n=10):
         yy.append(np.linspace(y0, y1, n, False))
     lon, lat = ct(np.concatenate(xx), np.concatenate(yy))
     lon_cnt, lat_cnt = ct(xc_, yc_)
-    wkt0 = ",".join("%.9g %.9g"%(x, y) for x, y in np.nditer([lon, lat]))
+    if hasattr(np, 'nditer'):
+        wkt0 = ",".join("%.9g %.9g"%(x, y) for x, y in np.nditer([lon, lat]))
+    else:
+        wkt0 = ",".join("%.9g %.9g"%(x, y) for x, y in zip(lon, lat))
     wkt0 = "EPSG:4326;POLYGON((%s, %.9g %.9g))"%(wkt0, lon[0], lat[0])
     wkt1 = "EPSG:4326;POINT(%.9g %.9g)"%(lon_cnt, lat_cnt)
     return ig.parseGeom(wkt0), ig.parseGeom(wkt1)
@@ -161,7 +164,7 @@ class ProfileSpotView(ProfileDimap):
         src_type = extract(xml, "//Source_Information/SOURCE_TYPE")
         if src_type != "SCENE":
             raise ValueError("Unknown SOURCE_TYPE '%s'"%src_type)
-        base_name = get_parent_id(xml)
+        base_name = cls.get_parent_id(xml)
         nbands = int(extract(xml, "//Raster_Dimensions/NBANDS"))
         nbits = int(extract(xml, "//Raster_Encoding/NBITS"))
         dtype = extract(xml, "//Raster_Encoding/DATA_TYPE")

@@ -101,8 +101,10 @@ def get_footprint_and_center(xml, n=10):
         row.append(np.linspace(r0, r1, n, False))
         col.append(np.linspace(c0, c1, n, False))
     lon, lat = loc_mod(np.concatenate(row), np.concatenate(col))
-
-    wkt0 = ",".join("%.9g %.9g"%(x, y) for x, y in np.nditer([lon, lat]))
+    if hasattr(np, 'nditer'):
+        wkt0 = ",".join("%.9g %.9g"%(x, y) for x, y in np.nditer([lon, lat]))
+    else:
+        wkt0 = ",".join("%.9g %.9g"%(x, y) for x, y in zip(lon, lat))
     wkt0 = "EPSG:4326;POLYGON((%s, %.9g %.9g))"%(wkt0, lon[0], lat[0])
     wkt1 = "EPSG:4326;POINT(%.9g %.9g)"%(lon_cnt, lat_cnt)
     return ig.parseGeom(wkt0), ig.parseGeom(wkt1)
