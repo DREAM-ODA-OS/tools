@@ -12,6 +12,16 @@ import img_geom as ig
 
 WGS84_SR = ig.parseSR("EPSG:4326")
 
+def interp_bilin((c, r), v):
+    """ simple bilinear GCP interpolation """
+    ac = (c-v[0][0])/(v[2][0]-v[0][0])
+    ar = (r-v[0][1])/(v[1][1]-v[0][1])
+    n = [(1-ac)*(1-ar), (1-ac)*ar, ac*ar, ac*(1-ar)]
+    x = sum(nn*vv[2] for nn, vv in zip(n ,v))
+    y = sum(nn*vv[3] for nn, vv in zip(n ,v))
+    return x, y
+
+
 def usage():
     sys.stderr.write("USAGE: %s <.N1> [WKT|WKB] [DEBUG]\n")
 
@@ -46,10 +56,10 @@ if __name__ == "__main__":
         ds = gdal.Open(INPUT)
         gcps = [(p.GCPLine, p.GCPPixel, p.GCPX, p.GCPY) for p in ds.GetGCPs()]
 
-        row0, row1 = [], []
-        col0, col1 = [], []
+        row0, row1 = [], [] 
+        col0, col1 = [], [] 
 
-        if len(gcps) == 0:
+        if len(gcps) == 0: 
             raise ValueError("Source image has not GCP!")
 
         # get the grid dimension
@@ -61,24 +71,27 @@ if __name__ == "__main__":
                 break
         nr = len(gcps) / nc
 
-        # collect points
-        xy = []
-        for i in xrange(nr-1):
-            xy.append(gcps[i*nc][2:4])
-        for i in xrange(nc-1):
-            xy.append(gcps[i+(nr-1)*nc][2:4])
-        for i in xrange(nr-1):
-            xy.append(gcps[(nr-i)*nc-1][2:4])
-        for i in xrange(nc-1):
-            xy.append(gcps[nc-i-1][2:4])
-        xy.append(xy[0])
+        #get centroind in pixel coordinates
+        rc_cnt = 0.5*ds.RasterYSize, 0.5*ds.RasterXSize
 
-        # create polygon geometry
-        lr = ogr.Geometry(ogr.wkbLinearRing)
-        for p in xy:
-            lr.AddPoint_2D(*p)
-        geom = ogr.Geometry(ogr.wkbPolygon)
-        geom.AddGeometry(lr)
+        #find the right 4 GCPs 
+        for ir in xrange(nr-1):
+            if rc_cnt[0] < gcps[(ir+1)*nc][0]:
+                break
+
+        for ic in xrange(nc-1):
+            if rc_cnt[1] < gcps[ic+1][1]:
+                break
+
+        # bilinear interpolation
+        xy_cnt = interp_bilin(rc_cnt, [
+            gcps[(ic+0)+(ir+0)*nc], gcps[(ic+1)+(ir+0)*nc],
+            gcps[(ic+1)+(ir+1)*nc], gcps[(ic+0)+(ir+1)*nc],
+        ])
+
+        # create point geometry
+        geom = ogr.Geometry(ogr.wkbPoint)
+        geom.AddPoint_2D(*xy_cnt)
         geom.AssignSpatialReference(WGS84_SR)
 
         # export
@@ -89,3 +102,4 @@ if __name__ == "__main__":
             traceback.print_exc(file=sys.stderr)
         print >>sys.stderr, "ERROR: %s: %s"%(EXENAME, e)
         sys.exit(1)
+
