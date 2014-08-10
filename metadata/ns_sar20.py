@@ -1,8 +1,8 @@
 #------------------------------------------------------------------------------
-# 
-#   XSI namespace 
 #
-# Project: XML Metadata Handling 
+#   SAR v2.0 namespace
+#
+# Project: XML Metadata Handling
 # Authors: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
@@ -11,8 +11,8 @@
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
-# copies of the Software, and to permit persons to whom the Software is 
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
 #
 # The above copyright notice and this permission notice shall be included in all
@@ -27,29 +27,50 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
-#from lxml.builder import ElementMaker
-from xml_utils import nn 
+from lxml.builder import ElementMaker
+from xml_utils import nn
+
+import ns_eop20 as ns_eop
+import ns_om20 as ns_om
+import ns_ows20 as ns_ows
+import ns_gml32 as ns_gml
+import ns_swe10 as ns_swe
+import ns_xsi as ns_xsi
+import ns_xlink as ns_xlink
 
 #------------------------------------------------------------------------------
-# schema location attribute 
-def getSchemaLocation( sl ) : return { schemaLocation : sl } 
+# namespace
+#------------------------------------------------------------------------------
+# schema location attribute
+
+# SchemaTron Rules
+STR = "http://schemas.opengis.net/omeo/1.0/schematron_rules_for_eop.xsl"
+# schema
+SL = "http://www.opengis.net/opt/2.0 http://schemas.opengis.net/omeo/1.0/sar.xsd"
 
 #------------------------------------------------------------------------------
-# namespace 
-
-NS="http://www.w3.org/2001/XMLSchema-instance"
-NS_MAP={ "xsi" : NS }
+# namespace
+NS = "http://www.opengis.net/sar/2.0"
+NS_MAP = {"sar": NS,
+          "eop": ns_eop.NS,
+          "om": ns_om.NS,
+          "ows": ns_ows.NS,
+          "gml": ns_gml.NS,
+          "swe": ns_swe.NS,
+          "xsi": ns_xsi.NS,
+          "xlink": ns_xlink.NS}
 
 #------------------------------------------------------------------------------
-# element maker 
-
-#E = ElementMaker(namespace=NS,nsmap=NS_MAP) 
+# element maker
+E = ElementMaker(namespace=NS, nsmap=NS_MAP)
 
 #------------------------------------------------------------------------------
-# predefined fully qualified names 
+# predefined fully qualified names
 
-# attributes 
-schemaLocation = nn(NS, "schemaLocation") 
-nil = nn(NS, "nil")
+# attributes
 
-# elements 
+# elements
+EarthObservation = nn(NS, "EarthObservation")
+#EarthObservationResult = nn(NS, "EarthObservationResult")
+
+#X = nn(NS, "X")

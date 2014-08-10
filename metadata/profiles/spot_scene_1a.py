@@ -339,5 +339,5 @@ class ProfileSpotScene1a(ProfileDimap):
         )
 
         xml_eop = etree.ElementTree(xml_eop)
-        xml_eop.getroot().addprevious(ns_eop.getSchematronPI())
+        #xml_eop.getroot().addprevious(ns_eop.getSchematronPI())
         return xml_eop

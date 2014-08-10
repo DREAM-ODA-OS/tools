@@ -70,6 +70,7 @@ E = ElementMaker(namespace=NS, nsmap=NS_MAP)
 # attributes
 
 # elements
+EarthObservation = nn(NS, "EarthObservation")
 EarthObservationResult = nn(NS, "EarthObservationResult")
 cloudCoverPercentage = nn(NS, "cloudCoverPercentage")
 cloudCoverPercentageQuotationMode = nn(NS, "cloudCoverPercentageQuotationMode")
