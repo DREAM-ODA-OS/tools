@@ -72,6 +72,22 @@ def add_alpha_channel( bi , mask ) :
 
     return bo 
 
+def range_stretch_noscale( bi, nodata, vmin, vmax , set_alpha = False ) :
+    
+    # output block 
+    bo = ib.ImgBlock('uint8',size=(bi.sx,bi.sy,bi.sz), offset=(bi.ox,bi.oy,0))
+
+    # no-data value mask 
+    mask = get_nodata_mask( bi, nodata )
+
+    #store values with no scaling apllied
+    bo.data[:,:,:] = bi.data[:,:,:]
+
+    # optionally add alpha channel 
+    if set_alpha : 
+        bo = add_alpha_channel( bo , mask )  
+
+    return bo 
 
 def range_stretch_lin( bi, nodata, vmin, vmax , set_alpha = False ) :
     
@@ -149,7 +165,8 @@ if __name__ == "__main__" :
     # block size 
     bsx , bsy = 256, 256 
     dbscale = False ; 
-    addalpha=False
+    addalpha = False
+    noscale = False 
 
     # default format options 
 
@@ -171,6 +188,8 @@ if __name__ == "__main__" :
         for opt in sys.argv[6:] :
             if opt.upper() == "DB" :
                 dbscale = True 
+            if opt.upper() == "NOSCALE" :
+                noscale = True 
             elif opt.upper() == "ADDALPHA" :
                 addalpha = True 
                 FOPTS["ALPHA"] = "YES"
@@ -220,7 +239,9 @@ if __name__ == "__main__" :
     imo = ib.createGeoTIFF( **prm ) 
 
     # stretch the ranges 
-    if dbscale : 
+    if noscale:
+        range_stretch = range_stretch_noscale
+    elif dbscale : 
         range_stretch = range_stretch_db
     else : 
         range_stretch = range_stretch_lin
