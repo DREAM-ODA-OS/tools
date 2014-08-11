@@ -188,7 +188,7 @@ if __name__ == "__main__" :
         for opt in sys.argv[6:] :
             if opt.upper() == "DB" :
                 dbscale = True 
-            if opt.upper() == "NOSCALE" :
+            elif opt.upper() == "NOSCALE" :
                 noscale = True 
             elif opt.upper() == "ADDALPHA" :
                 addalpha = True 
