@@ -34,7 +34,7 @@ import ns_eop20 as ns_eop
 import ns_om20 as ns_om
 import ns_ows20 as ns_ows
 import ns_gml32 as ns_gml
-import ns_swe20 as ns_swe
+import ns_swe10 as ns_swe
 import ns_xsi as ns_xsi
 import ns_xlink as ns_xlink
 
@@ -56,7 +56,6 @@ NS_MAP = {"opt": NS,
           "om": ns_om.NS,
           "ows": ns_ows.NS,
           "gml": ns_gml.NS,
-          "swe": ns_swe.NS,
           "xsi": ns_xsi.NS,
           "xlink": ns_xlink.NS}
 
