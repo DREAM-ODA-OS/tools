@@ -35,7 +35,7 @@ import geom as ig
 import ns_om20 as ns_om
 import ns_ows20 as ns_ows
 import ns_gml32 as ns_gml
-import ns_swe10 as ns_swe
+import ns_swe20 as ns_swe
 import ns_xsi as ns_xsi
 import ns_xlink as ns_xlink
 
@@ -164,7 +164,6 @@ def getBrowse(type, srs, url, subtype=None):
 
 
 def getProduct(srs, url, version=None, size=None, timeliness=None):
-
     tmp = []
 
     if srs:
@@ -186,7 +185,6 @@ def getProduct(srs, url, version=None, size=None, timeliness=None):
 
 
 def getMask(type, format, srs=None, geom=None, url=None, post=None, subtype=None):
-
     tmp = [
         E.type(type),
         E.format(format),

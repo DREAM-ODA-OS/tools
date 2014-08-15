@@ -1,6 +1,6 @@
 #------------------------------------------------------------------------------
 #
-#   SAR v2.0 namespace
+#   SWE v2.0 namespace
 #
 # Project: XML Metadata Handling
 # Authors: Martin Paces <martin.paces@eox.at>
@@ -30,38 +30,15 @@
 from lxml.builder import ElementMaker
 from xml_utils import nn
 
-import ns_eop20 as ns_eop
-import ns_om20 as ns_om
-import ns_ows20 as ns_ows
-import ns_gml32 as ns_gml
-import ns_swe20 as ns_swe
-import ns_xsi as ns_xsi
-import ns_xlink as ns_xlink
-
 #------------------------------------------------------------------------------
 # namespace
-#------------------------------------------------------------------------------
-# schema location attribute
 
-# SchemaTron Rules
-STR = "http://schemas.opengis.net/omeo/1.0/schematron_rules_for_eop.xsl"
-# schema
-SL = "http://www.opengis.net/opt/2.0 http://schemas.opengis.net/omeo/1.0/sar.xsd"
-
-#------------------------------------------------------------------------------
-# namespace
-NS = "http://www.opengis.net/sar/2.0"
-NS_MAP = {"sar": NS,
-          "eop": ns_eop.NS,
-          "om": ns_om.NS,
-          "ows": ns_ows.NS,
-          "gml": ns_gml.NS,
-          "swe": ns_swe.NS,
-          "xsi": ns_xsi.NS,
-          "xlink": ns_xlink.NS}
+NS = "http://www.opengis.net/swe/2.0"
+NS_MAP = {"swe": NS}
 
 #------------------------------------------------------------------------------
 # element maker
+
 E = ElementMaker(namespace=NS, nsmap=NS_MAP)
 
 #------------------------------------------------------------------------------
@@ -70,7 +47,16 @@ E = ElementMaker(namespace=NS, nsmap=NS_MAP)
 # attributes
 
 # elements
-EarthObservation = nn(NS, "EarthObservation")
-#EarthObservationResult = nn(NS, "EarthObservationResult")
+DataRecord = nn(NS, 'DataRecord')
+AllowedValues = nn(NS, 'AllowedValues')
+NilValues = nn(NS, 'NilValues')
+field = nn(NS, 'field')
+Quantity = nn(NS, 'Quantity')
+description = nn(NS, 'description')
+nilValues = nn(NS, 'nilValues')
+nilValue = nn(NS, 'nilValue')
+uom = nn(NS, 'uom')
+constraint = nn(NS, 'constraint')
+interval = nn(NS, 'interval')
+significantFigures = nn(NS, 'significantFigures')
 
-#X = nn(NS, "X")

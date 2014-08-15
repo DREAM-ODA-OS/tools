@@ -40,7 +40,6 @@ OGC_TYPE_DEFS = {
     'uint16': "http://www.opengis.net/def/property/netcdf/1.0/unsignedShort",
 }
 
-
 def tag(elm):
     return None if elm is None else elm.tag
 

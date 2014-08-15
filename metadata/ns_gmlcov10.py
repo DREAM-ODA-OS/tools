@@ -1,12 +1,12 @@
 #------------------------------------------------------------------------------
 #
-#   SAR v2.0 namespace
+#   GML-COV v1.0 namespace
 #
 # Project: XML Metadata Handling
 # Authors: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
-# Copyright (C) 2013 EOX IT Services GmbH
+# Copyright (C) 2014 EOX IT Services GmbH
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -40,28 +40,24 @@ import ns_xlink as ns_xlink
 
 #------------------------------------------------------------------------------
 # namespace
-#------------------------------------------------------------------------------
-# schema location attribute
 
-# SchemaTron Rules
-STR = "http://schemas.opengis.net/omeo/1.0/schematron_rules_for_eop.xsl"
-# schema
-SL = "http://www.opengis.net/opt/2.0 http://schemas.opengis.net/omeo/1.0/sar.xsd"
+#SL = "" TODO: add schema location
+NS = "http://www.opengis.net/gmlcov/1.0"
 
-#------------------------------------------------------------------------------
-# namespace
-NS = "http://www.opengis.net/sar/2.0"
-NS_MAP = {"sar": NS,
-          "eop": ns_eop.NS,
-          "om": ns_om.NS,
-          "ows": ns_ows.NS,
-          "gml": ns_gml.NS,
-          "swe": ns_swe.NS,
-          "xsi": ns_xsi.NS,
-          "xlink": ns_xlink.NS}
+NS_MAP = {
+     "gmlcov": NS,
+     "eop": ns_eop.NS,
+     "om": ns_om.NS,
+     "ows": ns_ows.NS,
+     "gml": ns_gml.NS,
+     "swe": ns_swe.NS,
+     "xsi": ns_xsi.NS,
+     "xlink": ns_xlink.NS,
+}
 
 #------------------------------------------------------------------------------
 # element maker
+
 E = ElementMaker(namespace=NS, nsmap=NS_MAP)
 
 #------------------------------------------------------------------------------
@@ -70,7 +66,7 @@ E = ElementMaker(namespace=NS, nsmap=NS_MAP)
 # attributes
 
 # elements
-EarthObservation = nn(NS, "EarthObservation")
-#EarthObservationResult = nn(NS, "EarthObservationResult")
 
-#X = nn(NS, "X")
+#XY = nn(NS, 'XY')
+rangeType = nn(NS, 'rangeType')
+
