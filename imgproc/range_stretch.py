@@ -72,23 +72,6 @@ def add_alpha_channel( bi , mask ) :
 
     return bo 
 
-def range_stretch_noscale( bi, nodata, vmin, vmax , set_alpha = False ) :
-    
-    # output block 
-    bo = ib.ImgBlock('uint8',size=(bi.sx,bi.sy,bi.sz), offset=(bi.ox,bi.oy,0))
-
-    # no-data value mask 
-    mask = get_nodata_mask( bi, nodata )
-
-    #store values with no scaling apllied
-    bo.data[:,:,:] = bi.data[:,:,:]
-
-    # optionally add alpha channel 
-    if set_alpha : 
-        bo = add_alpha_channel( bo , mask )  
-
-    return bo 
-
 def range_stretch_lin( bi, nodata, vmin, vmax , set_alpha = False ) :
     
     # output block 
@@ -197,12 +180,16 @@ if __name__ == "__main__" :
                 FOPTS.setOption( opt )
 
     except IndexError : 
-        
         sys.stderr.write("Not enough input arguments!\n") 
         sys.stderr.write("USAGE: %s <input image> <output mask/TIF> <min.> <max.> <no data value or list>\n"%exename) 
         sys.stderr.write("EXAMPLE: %s input.tif output.tif 10 12000 0,0,0,0\n"%exename) 
         sys.stderr.write("EXAMPLE: %s input.tif output.tif 2 20 0\n"%exename) 
         sys.exit(1) 
+
+    if noscale:
+        VMIN = 2
+        VMAX = 255
+        dbscale = False
 
     # open input image 
     imi = ib.ImgFileIn( INPUT ) 
