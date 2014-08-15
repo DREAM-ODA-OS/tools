@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #-------------------------------------------------------------------------------
 #
-#  This tool takes the mask claculated by the extract_mask tool
-#  and calculates the offset ans size of the image subset
-#  without the no-data borders and containing the original
-#  valid data.
+#  This tool takes a mask calculated by the extract_mask
+#  and search the minimum subset of the image contaning 
+#  the valid pixel. 
+#  The extent of this subset is returned as pixel offset and size. 
 #
 #  As output the command writes 4 comma separated integers values:
 #
@@ -40,116 +40,85 @@ import os.path
 import img_block as ib
 import numpy as np
 
-def getDataExtent( bi, nodata ) :
+def getDataExtent(bi, nodata):
 
-    #--------------------------------------------------------------------------
     # X coordinate
-
     xmin = bi.ux
     xmax = bi.ox
-
-    # find X minimum
-    for i in xrange( bi.sx ) :
-
+    for i in xrange(bi.sx): # find X minimum
         # get count of valid pixels
-        s = np.sum( bi.data[:,i,0] != nodata )
-
-        if ( s > 0 ) :
+        s = np.sum(bi.data[:, i, 0] != nodata)
+        if s > 0:
             xmin = bi.ox + i
             break
 
-    # find X maximum
-    for i in xrange( bi.sx-1 , xmin-bi.ox-1 , -1 ) :
-
+    for i in xrange(bi.sx-1, xmin-bi.ox-1, -1): # find X maximum
         # get count of valid pixels
-        s = np.sum( bi.data[:,i,0] != nodata )
-
-        if ( s > 0 ) :
+        s = np.sum(bi.data[:, i, 0] != nodata)
+        if s > 0:
             xmax = bi.ox + i + 1
             break
 
-    if xmax < xmin : xmax = xmin + 1
-    if xmax > bi.ux : xmax = bi.ux
+    if xmax < xmin:
+        xmax = xmin + 1
+    if xmax > bi.ux:
+        xmax = bi.ux
 
-    #--------------------------------------------------------------------------
+    if xmin >= bi.ux: # no data found - the image is empty
+        return ib.ImgExtent((0, 0, imi.sz), (bi.ox, bi.oy, 0))
 
-    if xmin >= bi.ux : # no data found - the image is empty
-        return ib.ImgExtent((0,0,imi.sz),(bi.ox,bi.oy,0))
-
-    #--------------------------------------------------------------------------
     # Y coordinate
-
     ymin = bi.uy
     ymax = bi.oy
-
-    # find Y minimum
-    for i in xrange( bi.sy ) :
-
+    for i in xrange(bi.sy): # find Y minimum
         # get count of valid pixels
-        s = np.sum( bi.data[i,:,0] != nodata )
-
-        if ( s > 0 ) :
+        s = np.sum(bi.data[i, :, 0] != nodata)
+        if s > 0:
             ymin = bi.oy + i
             break
 
-    # find Y maximum
-    for i in xrange( bi.sy-1 , ymin-bi.oy-1 , -1 ) :
-
+    for i in xrange(bi.sy-1, ymin-bi.oy-1, -1): # find Y maximum
         # get count of valid pixels
-        s = np.sum( bi.data[i,:,0] != nodata )
-
-        if ( s > 0 ) :
+        s = np.sum(bi.data[i, :, 0] != nodata)
+        if s > 0:
             ymax = bi.oy + i + 1
             break
 
-    if ymax < ymin : ymax = ymin + 1
-    if ymax > bi.uy : ymax = bi.uy
+    if ymax < ymin:
+        ymax = ymin + 1
+    if ymax > bi.uy:
+        ymax = bi.uy
 
-    #--------------------------------------------------------------------------
-
-    return ib.ImgExtent((xmax-xmin,ymax-ymin,imi.sz),(xmin,ymin,0))
+    return ib.ImgExtent((xmax-xmin, ymax-ymin, imi.sz), (xmin, ymin, 0))
 
 
-#------------------------------------------------------------------------------
-
-if __name__ == "__main__" :
-
-    # TODO: block processing 
+if __name__ == "__main__":
     # TODO: to improve CLI
-
-    exename = os.path.basename( sys.argv[0] )
-    # block size
-    bsx , bsy = 256, 256
+    EXENAME = os.path.basename(sys.argv[0])
 
     try:
-
         INPUT = sys.argv[1]
         NODATA = sys.argv[2]
 
-    except IndexError :
-
+    except IndexError:
         sys.stderr.write("Not enough input arguments!\n")
-        sys.stderr.write("USAGE: %s <input image mask> <no data value>\n"%exename)
-        sys.stderr.write("EXAMPLE: %s mask.tif 0\n"%exename)
+        sys.stderr.write("USAGE: %s <input image mask> <no data value>\n"%EXENAME)
+        sys.stderr.write("EXAMPLE: %s mask.tif 0\n"%EXENAME)
         sys.exit(1)
 
     # open input image
-    imi = ib.ImgFileIn( INPUT )
+    imi = ib.ImgFileIn(INPUT)
 
     # convert no-data values to the image's data type
-    NODATA = np.dtype(imi.dtype).type( NODATA )
+    NODATA = np.dtype(imi.dtype).type(NODATA)
 
     # load the mask as single image
-    bi = ib.ImgBlock( 'uint8' , (imi.sx,imi.sy,1) )
+    bi = ib.ImgBlock('uint8', (imi.sx, imi.sy, 1))
 
     # load image block
-    imi.read( bi )
+    imi.read(bi)
 
-    #--------------------------------------------------------------------------
     # extract subset
+    subset = getDataExtent(bi, NODATA)
 
-    subset = getDataExtent( bi, NODATA )
-
-    # print the subset
-
-    print  "%d,%d,%d,%d"%( subset.ox, subset.oy, subset.sx, subset.sy )
+    print  "%d,%d,%d,%d"%(subset.ox, subset.oy, subset.sx, subset.sy)
