@@ -31,6 +31,7 @@ import re
 import sys
 import math as m
 import numpy as np
+from collections import Iterable
 from osgeo import ogr ; ogr.UseExceptions()
 from osgeo import osr ; osr.UseExceptions()
 
@@ -49,15 +50,24 @@ class CTransform(object):
         self._ct = osr.CoordinateTransformation(sr_src, sr_dst)
 
     def __call__(self, xarr, yarr):
-        try:
+        if hasattr(np, 'nditer') and isinstance(xarr, np.ndarray) and isinstance(yarr, np.ndarray):
+            # NumPy array
             if xarr.shape != yarr.shape:
                 raise ValueError("Array shape mismatch!")
             itr = np.nditer([xarr, yarr, None, None], [], [RO, RO, WO, WO])
             for x, y, u, v in itr:
                 u[...], v[...], _ = self._ct.TransformPoint(float(x), float(y))
             return itr.operands[2], itr.operands[3]
-        except AttributeError:
-            return self._ct.TransformPoint(xarr, yarr)[0:2]
+        elif isinstance(xarr, Iterable) and isinstance(xarr, Iterable):
+            # generic iterables + NumPy prior 'np.nditer'
+            u, v = [], []
+            for x, y in zip(xarr, yarr):
+                _u, _v, _ = self._ct.TransformPoint(float(x), float(y))
+                u.append(_u)
+                v.append(_v)
+            return u, v
+        else: # assuming scalar values
+            return self._ct.TransformPoint(float(xarr), float(yarr))[0:2]
 
 #-------------------------------------------------------------------------------
 # spatial references
