@@ -101,8 +101,8 @@ if __name__ == "__main__":
         tmtx0 = imi.ds.GetGeoTransform()
 
         # calculate the new offset of the origin
-        ox = tmtx0[0] + tmtx0[1] * ss.ox + tmtx0[2] * ss.ox
-        oy = tmtx0[3] + tmtx0[4] * ss.oy + tmtx0[5] * ss.oy
+        ox = tmtx0[0] + tmtx0[1] * ss.ox + tmtx0[2] * ss.oy
+        oy = tmtx0[3] + tmtx0[4] * ss.ox + tmtx0[5] * ss.oy
 
         # new transformation matrix
         tmtx1 = [ox, tmtx0[1], tmtx0[2], oy, tmtx0[4], tmtx0[5]]
