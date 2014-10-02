@@ -45,6 +45,7 @@ RO = ['readonly']
 WO = ['writeonly', 'allocate']
 
 class CTransform(object):
+    """GDAL/SRS coordinate transformation."""
 
     def __init__(self, sr_src, sr_dst):
         self._ct = osr.CoordinateTransformation(sr_src, sr_dst)
@@ -68,6 +69,40 @@ class CTransform(object):
             return u, v
         else: # assuming scalar values
             return self._ct.TransformPoint(float(xarr), float(yarr))[0:2]
+
+
+class GTMTransform(object):
+    """GDAL Geo-Transformation Matrix based (affine) transformation."""
+
+    def __init__(self, gtm):
+        self._gtm = gtm
+
+    def __transform(self, col, row):
+        gtm = self._gtm
+        x = gtm[0] + gtm[1]*col + gtm[2]*row
+        y = gtm[3] + gtm[4]*col + gtm[5]*row
+        return x, y
+
+    def __call__(self, xarr, yarr):
+        if hasattr(np, 'nditer') and isinstance(xarr, np.ndarray) and isinstance(yarr, np.ndarray):
+            # NumPy array
+            if xarr.shape != yarr.shape:
+                raise ValueError("Array shape mismatch!")
+            itr = np.nditer([xarr, yarr, None, None], [], [RO, RO, WO, WO])
+            for x, y, u, v in itr:
+                u[...], v[...] = self.__transform(float(x), float(y))
+            return itr.operands[2], itr.operands[3]
+        elif isinstance(xarr, Iterable) and isinstance(xarr, Iterable):
+            # generic iterables + NumPy prior 'np.nditer'
+            u, v = [], []
+            for x, y in zip(xarr, yarr):
+                _u, _v = self.__transform(float(x), float(y))
+                u.append(_u)
+                v.append(_v)
+            return u, v
+        else: # assuming scalar values
+            return self.__transform(float(xarr), float(yarr))
+
 
 #-------------------------------------------------------------------------------
 # spatial references
