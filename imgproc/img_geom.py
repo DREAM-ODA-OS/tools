@@ -100,7 +100,7 @@ def parseSR(srs, debug=False):
         match = regex.match(srs)
         if match is not None:
             return createSRFromEPSG(int(match.group(1)))
-    if srs[:7] == "PROJCS[":
+    if srs[:7] in ("PROJCS[", "GEOGCS["):
         return osr.SpatialReference(srs)
     if srs in (None, "", "NONE"):
         return None
