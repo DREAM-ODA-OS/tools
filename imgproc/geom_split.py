@@ -151,7 +151,6 @@ if __name__ == "__main__":
         MAX_Y_SIZE = float(sys.argv[3])
 
         for arg in sys.argv[4:]:
-
             if arg == "DEBUG":
                 DEBUG = True
             elif RES_X is None:
@@ -161,9 +160,6 @@ if __name__ == "__main__":
             else:
                 sys.stderr.write("Invalid parameter '%s'!\n"%(arg))
                 sys.exit(1)
-
-        if len(sys.argv) > 4 and sys.argv[4] == "DEBUG":
-            DEBUG = True
 
         if RES_X is None:
             RES_X = 0
