@@ -93,13 +93,12 @@ if __name__ == "__main__":
 
     SOURCE_SR = geom.GetSpatialReference()
 
-    # 1) geometry either source or target SR is None -> assign the target
+    # assing the default spatial reference (WGS84)
     if SOURCE_SR is None:
         geom.AssignSpatialReference(WGS84_SR)
 
-    # 2) transform coordinates
-    else:
-        geom = ig.mapToWGS84(geom)
+    # process the coordinates
+    geom = ig.mapToWGS84(geom)
 
     #--------------------------------------------------------------------------
     # export
