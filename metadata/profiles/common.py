@@ -29,6 +29,36 @@
 #-------------------------------------------------------------------------------
 
 import os.path
+import re
+
+RE_ISO_8601 = re.compile(
+    r"^(?P<year>\d{4,4})-?(?P<month>\d{2,2})-?(?P<day>\d{2,2})"
+    r"(?:[ T](?P<hour>\d{2,2})"
+    r"(?::?(?P<min>\d{2,2})(?::?(?P<sec>\d{2,2}(?:\.\d+)?))?)?"
+    r"(?P<tzone>(?:(?P<tzhour>[+-]\d{2,2})(?::?(?P<tzmin>\d{2,2}))?)|(?P<tzzero>Z))?"
+    r")?$"
+)
+
+def isodt(dtstr):
+    """Fix ISO 8601 date-time string."""
+    def _dic2str(year, month, day, hour=None, min=None, sec=None,
+            tzone=None, tzhour=None, tzmin=None, tzzero=None, **kwarg):
+        tzhour = tzhour or '+00'
+        tzmin = tzmin or '00'
+        if tzone is None or tzzero == 'Z':
+            tzone = 'Z'
+        elif tzhour in ('+00', '-00') and tzmin == '00':
+            tzone = 'Z'
+        else:
+            tzone = "%s:%s"%(tzhour, tzmin)
+        return "%s-%s-%sT%s:%s:%s%s"%(
+            year, month, day, hour or '00', min or '00', sec or '00', tzone
+        )
+    m = RE_ISO_8601.match(dtstr)
+    if m is None:
+        raise ValueError("Invalid ISO8601 date/time '%s'!"%dtstr)
+    return _dic2str(**m.groupdict())
+
 
 GDAL_TYPES = {
     'uint8' : "Byte",

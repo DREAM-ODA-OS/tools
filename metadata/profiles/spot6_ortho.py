@@ -30,7 +30,7 @@
 
 from .common import (
     GDAL_TYPES, OGC_TYPE_DEFS,
-    check, extract, extattr,
+    check, extract, extattr, isodt
 )
 
 import os.path
@@ -341,14 +341,20 @@ class ProfileSpot6Ortho(ProfileDimap):
         OM = ns_om.E
         #GML = ns_gml.E
 
-        time_acq_start = "%sT%sZ"%(
+        time_acq_start = isodt("%sT%s"%(
             extract(xml, "//Source_Identification/Strip_Source/IMAGING_DATE"),
-            extract(xml, "//Source_Identification/Strip_Source/IMAGING_TIME"))
+            extract(xml, "//Source_Identification/Strip_Source/IMAGING_TIME")
+        ))
         time_acq_stop = time_acq_start
-        time_prod = extract(xml, "//Delivery_Identification/PRODUCTION_DATE")
+        time_prod = isodt(extract(xml, "//Delivery_Identification/PRODUCTION_DATE"))
 
-        # extracting angles
+        # extracting angles and times
         for elm in xml.iterfind("//Geometric_Data/Use_Area/Located_Geometric_Values"):
+            time = isodt(extract(elm, "./TIME"))
+            if time < time_acq_start:
+                time_acq_start = time
+            elif time > time_acq_stop:
+                time_acq_stop = time
             if "Center" != extract(elm, "./LOCATION_TYPE"):
                 continue
             #cnt_row = int(extract(elm, "./ROW"))
