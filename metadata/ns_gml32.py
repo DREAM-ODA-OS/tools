@@ -80,6 +80,7 @@ surfaceMember = nn(NS,"surfaceMember")
 exterior = nn(NS,"exterior")
 interior = nn(NS,"interior")
 posList = nn(NS,"posList")
+coordinates = nn(NS,"coordinates")
 
 #X=nn(NS,"X")
 
@@ -135,7 +136,7 @@ def _get_formater(geom, sr):
 
 def getPoint(geom, sr=None):
     _str = _get_formater(geom, sr)
-    return E.Point(getId(), _str(geom.GetPoint(0)))
+    return E.Point(getId(), E.coordinates(_str(geom.GetPoint(0))))
 
 def getPointList2D(geom, sr=None):
     _str = _get_formater(geom, sr)
