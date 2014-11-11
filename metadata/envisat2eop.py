@@ -113,9 +113,9 @@ def eop_asar(header, platform='ENVISAT:ASAR', ns_sar=None):
         )),
         EOP.acquisitionParameters(SAR.Acquisition(
             EOP.orbitNumber("%d"%header.mph['ABS_ORBIT']),
-            EOP.orbitDirection(header.sph['PASS']),
+            EOP.orbitDirection(header.sph['PASS'].strip()),
             EOP.wrsLongitudeGrid("%d"%header.mph['REL_ORBIT'],
-                **{ns_eop.codeSpace: _wrs_code_space}),
+                **{'codeSpace': _wrs_code_space}),
             SAR.polarisationMode(_polmode),
             SAR.polarisationChannels(_polchannels),
         )),
@@ -134,6 +134,7 @@ def eop_asar(header, platform='ENVISAT:ASAR', ns_sar=None):
     )
 
     xml_eop = SAR.EarthObservation(
+        ns_gml.getId(),
         ns_eop.getSchemaLocation("SAR"),
         OM.phenomenonTime(ns_gml.getTimePeriod(time_acq_start, time_acq_stop)),
         #OM.resultQuality(), #optional

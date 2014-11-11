@@ -47,8 +47,8 @@ import ns_gmlcov10 as ns_gmlcov
 #------------------------------------------------------------------------------
 # namespace
 
-SL = "http://schemas.opengis.net/wcseo/1.0/wcsEOAll.xsd"
-NS = "http://www.opengis.net/wcseo/1.0"
+SL = "http://schemas.opengis.net/wcs/wcseo/1.0/wcsEOAll.xsd"
+NS = "http://www.opengis.net/wcs/wcseo/1.0"
 
 NS_MAP = {
      "wcseo": NS,
