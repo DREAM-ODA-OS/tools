@@ -174,9 +174,9 @@ def eop_meris(header, ns_opt=None):
     time_prod = header.mph['PROC_TIME'].isoformat().replace("+00:00", "Z")
 
     if header.sph['FIRST_MID_LAT'] > header.sph['LAST_MID_LAT']:
-        _pass = EOP.orbitDirection("DESCENDING")
+        _pass = "DESCENDING"
     else:
-        _pass = EOP.orbitDirection("ASCENDING")
+        _pass = "ASCENDING"
 
     eo_equipment = EOP.EarthObservationEquipment(
         ns_gml.getRandomId(),
