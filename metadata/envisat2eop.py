@@ -127,10 +127,18 @@ def eop_asar(header, platform='ENVISAT:ASAR', ns_sar=None):
         EOP.acquisitionType("NOMINAL"),
         EOP.productType(header.mph['PRODUCT'][:10]),
         EOP.status("ARCHIVED"),
-        EOP.acquisitionStation(header.mph['ACQUISITION_STATION'].strip()),
-        EOP.processingDate(time_prod),
-        EOP.processingStation(header.mph['PROC_CENTER'].strip()),
-        EOP.processorVersion(header.mph['SOFTWARE_VER'].strip()),
+        EOP.downlinkedTo(
+            EOP.DownlinkInformation(
+                EOP.acquisitionStation(header.mph['ACQUISITION_STATION'].strip()),
+            ),
+        ),
+        EOP.processing(
+            EOP.ProcessingInformation(
+                EOP.processingDate(time_prod),
+                EOP.processingCenter(header.mph['PROC_CENTER'].strip()),
+                EOP.processorVersion(header.mph['SOFTWARE_VER'].strip()),
+            ),
+        ),
     )
 
     xml_eop = SAR.EarthObservation(
