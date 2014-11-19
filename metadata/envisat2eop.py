@@ -97,10 +97,11 @@ def eop_asar(header, platform='ENVISAT:ASAR', ns_sar=None):
     _polchannels = [_polar(header.sph['MDS1_TX_RX_POLAR'])]
     if header.sph['MDS2_TX_RX_POLAR'] != '   ':
         _polchannels.append(_polar(header.sph['MDS2_TX_RX_POLAR']))
-    if _polchannels[1] == "VV":
-        _polchannels = (_polchannels[1], _polchannels[0])
-    if _polchannels[1] == "HH":
-        _polchannels = (_polchannels[1], _polchannels[0])
+    if len(_polchannels) > 1:
+        if _polchannels[1] == "VV":
+            _polchannels = (_polchannels[1], _polchannels[0])
+        if _polchannels[1] == "HH":
+            _polchannels = (_polchannels[1], _polchannels[0])
     _polchannels = ", ".join(_polchannels)
 
     eo_equipment = EOP.EarthObservationEquipment(
