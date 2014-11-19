@@ -97,6 +97,10 @@ def eop_asar(header, platform='ENVISAT:ASAR', ns_sar=None):
     _polchannels = [_polar(header.sph['MDS1_TX_RX_POLAR'])]
     if header.sph['MDS2_TX_RX_POLAR'] != '   ':
         _polchannels.append(_polar(header.sph['MDS2_TX_RX_POLAR']))
+    if _polchannels[1] == "VV":
+        _polchannels = (_polchannels[1], _polchannels[0])
+    if _polchannels[1] == "HH":
+        _polchannels = (_polchannels[1], _polchannels[0])
     _polchannels = ", ".join(_polchannels)
 
     eo_equipment = EOP.EarthObservationEquipment(
@@ -134,22 +138,22 @@ def eop_asar(header, platform='ENVISAT:ASAR', ns_sar=None):
         ),
         EOP.processing(
             EOP.ProcessingInformation(
-                EOP.processingDate(time_prod),
                 EOP.processingCenter(header.mph['PROC_CENTER'].strip()),
+                EOP.processingDate(time_prod),
                 EOP.processorVersion(header.mph['SOFTWARE_VER'].strip()),
             ),
         ),
     )
 
     xml_eop = SAR.EarthObservation(
-        ns_gml.getId(),
+        ns_gml.getRandomId(),
         ns_eop.getSchemaLocation("SAR"),
         OM.phenomenonTime(ns_gml.getTimePeriod(time_acq_start, time_acq_stop)),
         #OM.resultQuality(), #optional
         OM.resultTime(ns_gml.getTimeInstant(time_acq_stop)),
         #OM.validTime(), # optional
         OM.procedure(eo_equipment),
-        OM.observedProperty({ns_xsi.nil: "true", "nillReason": "inapplicable"}),
+        OM.observedProperty({ns_xsi.nil: "true", "nilReason": "inapplicable"}),
         OM.featureOfInterest(
             #ns_eop.getFootprint(*get_footprint_and_center(header))
         ),
@@ -195,7 +199,7 @@ def eop_meris(header, ns_opt=None):
             EOP.orbitNumber("%d"%header.mph['ABS_ORBIT']),
             EOP.orbitDirection(_pass),
             EOP.wrsLongitudeGrid("%d"%header.mph['REL_ORBIT'],
-                **{ns_eop.codeSpace: "ENVISAT MERIS"}),
+                **{'codeSpace': "ENVISAT MERIS"}),
         )),
     )
 
@@ -205,13 +209,22 @@ def eop_meris(header, ns_opt=None):
         EOP.acquisitionType("NOMINAL"),
         EOP.productType(header.mph['PRODUCT'][:10]),
         EOP.status("ARCHIVED"),
-        EOP.acquisitionStation(header.mph['ACQUISITION_STATION'].strip()),
-        EOP.processingDate(time_prod),
-        EOP.processingStation(header.mph['PROC_CENTER'].strip()),
-        EOP.processorVersion(header.mph['SOFTWARE_VER'].strip()),
+        EOP.downlinkedTo(
+            EOP.DownlinkInformation(
+                EOP.acquisitionStation(header.mph['ACQUISITION_STATION'].strip()),
+            ),
+        ),
+        EOP.processing(
+            EOP.ProcessingInformation(
+                EOP.processingCenter(header.mph['PROC_CENTER'].strip()),
+                EOP.processingDate(time_prod),
+                EOP.processorVersion(header.mph['SOFTWARE_VER'].strip()),
+            ),
+        ),
     )
 
     xml_eop = OPT.EarthObservation(
+        ns_gml.getRandomId(),
         ns_eop.getSchemaLocation("OPT"),
         #EOP.parameter(), #optional
         OM.phenomenonTime(ns_gml.getTimePeriod(time_acq_start, time_acq_stop)),
@@ -219,7 +232,7 @@ def eop_meris(header, ns_opt=None):
         OM.resultTime(ns_gml.getTimeInstant(time_prod)),
         #OM.validTime(), # optional
         OM.procedure(eo_equipment),
-        OM.observedProperty({ns_xsi.nil: "true", "nillReason": "inapplicable"}),
+        OM.observedProperty({ns_xsi.nil: "true", "nilReason": "inapplicable"}),
         OM.featureOfInterest(
             #ns_eop.getFootprint(*get_footprint_and_center(header))
         ),
