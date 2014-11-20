@@ -195,6 +195,7 @@ def eop_meris(header, ns_opt=None):
         ),
         EOP.sensor(EOP.Sensor(
             EOP.sensorType("OPTICAL"),
+            EOP.operationalMode(header.mph['PRODUCT'][4:6]),
         )),
         EOP.acquisitionParameters(EOP.Acquisition(
             EOP.orbitNumber("%d"%header.mph['ABS_ORBIT']),
