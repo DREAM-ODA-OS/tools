@@ -58,40 +58,24 @@ class Record(object):
         "value's type"
         return self.__v.__class__.__name__.upper()
 
-    #value = property(fget=lambda self: self.__v, doc="record's value object (RO)")
-    #key = property(fget=lambda self: self.__k, doc="record's key (RO)")
-    #dtype = property(fget=lambda self: self.__v.__class__.__name__.upper(),
-    #                 doc="value's type (RO)")
-
     def __str__(self):
-
         if self.key is None:
             rv = str(self.value)
         else:
             rv = "%s=%s" % (self.key, self.value)
-
-        # validate the length of the record
 
         if len(rv) != self.length:
             raise RuntimeError("Record length overflow! RECORD='%s'" % rv)
 
         return rv
 
-
     def __init__(self, data):
-
         try: # split the key and value
-
             self.__k, tmp = data.split('=')
-
         except ValueError: # separator
-
             self.__k, self.__v = None, eht.Spare(data)
-
         else: # parse key/value pair
-
             self.__v = eht.parse_header_value(tmp)
-
 
     @property
     def length(self):
@@ -135,7 +119,6 @@ class HeaderSection(object):
     def length(self):
         """ return length of the header """
         raise RuntimeError
-        #return
 
     def __str__(self):
         """ dump header to a file """
@@ -179,13 +162,6 @@ class ProductHeader(object):
     def dsds_all(self):
         "list of product's DSDs including the spares"
         return self.__ldsd_all
-
-#    mph = property(fget=lambda self: self.__mph, doc="Product's MPH (RO)")
-#    sph = property(fget=lambda self: self.__sph, doc="Product's SPH (RO)")
-#    dsd = property(fget=lambda self: self.__idsd, doc="Product's DSDs (RO)")
-#    dsds = property(fget=lambda self: self.__ldsd, doc="List of product's DSDs (RO)")
-#    dsds_all = property(fget=lambda self: self.__ldsd_all, doc=
-#                            "List of product's DSDs including the spares (RO)")
 
     @property
     def length(self):

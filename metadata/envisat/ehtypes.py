@@ -75,14 +75,13 @@ re_efloat_simple = r'(?P<mnt>[+-][0-9](?:\.[0-9]+))E(?P<exp>[+-][0-9]+)'
 regex_efloat_simple = re.compile(re_efloat_simple)
 
 # removing leading zerro
-
 regex_lzerro = p = re.compile(r"([+-])0\.")
 
 
 # non-capturing number
 re_num_nc = r'(?:[+-][0-9]*)(?:\.(?:[0-9]+))?(?:E(?:[+-][0-9]+))?'
-# number array
 
+# number array
 re_numarr = r'^(?P<numarr>(?:%s){2,})(?:%s)?$'%(re_num_nc, re_n_unit)
 
 regex_number = re.compile("^%s$"%re_number)
