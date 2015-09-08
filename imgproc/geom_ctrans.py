@@ -33,7 +33,7 @@ import traceback
 import os.path 
 import img_geom as ig 
 from osgeo import ogr ; ogr.UseExceptions() 
-from osgeo import osr ; ogr.UseExceptions() 
+from osgeo import osr ; osr.UseExceptions() 
 #from osgeo import gdal ; gdal.UseExceptions() 
 
 #TODO: remove date-line handling moved to the 'geom_to_wgs84.py' 
