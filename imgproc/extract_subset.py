@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 #------------------------------------------------------------------------------
 #
-#   This tool extracts subset of the image specified by the row/column
-#   offset of the upper-left corenr and row/column size of extracted
-#   block. The tool takes care about preserving the geo-metadata.
+#   This tool extracts subset of an image specified by the row/column
+#   offset of the upper-left corner and row/column size of extracted
+#   block. The tool takes care of preserving the geocoding.
 #
 # Project: Image Processing Tools
 # Authors: Martin Paces <martin.paces@eox.at>
@@ -31,116 +31,88 @@
 #-------------------------------------------------------------------------------
 
 import sys
-import os.path
-from osgeo import gdal ; gdal.UseExceptions()
-import img_block as ib
-import img_util as iu
+from os.path import basename
+from img import (
+    FormatOptions, create_geotiff, DEF_GEOTIFF_FOPT,
+    Extent, Block, ImageFileReader, Progress, execute,
+    pixel_offset
+)
+from img.cli import error
 
-# tiepoint offset - higher order function
-def tiepointOffsetter((ox, oy)):
-    def function(p):
-        return gdal.GCP(p.GCPX, p.GCPY, p.GCPZ, p.GCPPixel - ox,
-                         p.GCPLine - oy, p.Info, p.Id)
-    return function
+def usage():
+    """Print a short command usage help."""
+    exename = basename(sys.argv[0])
+    print >>sys.stderr, (
+        "USAGE: %s <input image> <output TIF> "
+        "<offset-x>,<offset-y>,<sizex>,<sizey>" % exename
+    )
+    print >>sys.stderr, (
+        "EXAMPLE: %s input.tif subset.tif 10,20,200,200" % exename
+    )
 
-def printout(s):
-    sys.stdout.write(s)
-    sys.stdout.flush()
 
-#------------------------------------------------------------------------------
+def parse_subset(subset_str):
+    """ Parse subset string. """
+    try:
+        offx, offy, sizex, sizey = (int(v) for v in subset_str.split(","))
+        return Extent((max(0, sizex), max(0, sizey)), (offx, offy))
+    except ValueError:
+        raise ValueError("Invalid subset specification! %r" % subset_str)
+
+
+def process(tile, img_in, img_out, subset):
+    """ Process one tile. """
+    tile = tile & img_out # clip tile to the image extent
+    b_in = img_in.read(Block(img_in.dtype, tile + subset.offset))
+    b_in -= subset.offset
+    img_out.write(b_in)
+
 
 if __name__ == "__main__":
-    # TODO: to improve CLI
-    exename = os.path.basename(sys.argv[0])
-    # block size
-    bsx, bsy = 256, 256
-
-    # default format options
-    FOPTS = ib.FormatOptions()
-    FOPTS["TILED"] = "YES"
-    FOPTS["BLOCKXSIZE"] = "256"
-    FOPTS["BLOCKYSIZE"] = "256"
-    FOPTS["COMPRESS"] = "DEFLATE"
-
+    FOPTS = FormatOptions(DEF_GEOTIFF_FOPT) # default format options
     try:
         INPUT = sys.argv[1]
         OUTPUT = sys.argv[2]
-        SUBSET = [int(v) for v in sys.argv[3].split(",")]
-        NODATA = 0 # TODO: make it parameter
-
+        SUBSET = parse_subset(sys.argv[3])
         #anything else treated as a format option
-        for opt in sys.argv[4:]:
-            FOPTS.setOption(opt)
-
+        FOPTS.set_options(sys.argv[5:])
     except IndexError:
-        print >>sys.stderr, "Not enough input arguments!"
-        print >>sys.stderr, "USAGE: %s <input image> <output TIF> <subset spec>"%exename
-        print >>sys.stderr, "EXAMPLE: %s input.tif subset.tif 10,20,200,200"%exename
+        error("Not enough input arguments!")
+        usage()
+        sys.exit(1)
+    except ValueError as exc:
+        error(exc)
         sys.exit(1)
 
     # open input image
-    imi = ib.ImgFileIn(INPUT)
+    IMG_IN = ImageFileReader(INPUT)
 
-    # convert subset to extent and trim it by the image extent
-    ss = imi&ib.ImgExtent((SUBSET[2], SUBSET[3], imi.sz), (SUBSET[0], SUBSET[1], 0))
+    # trim the subset by the input image extent
+    SUBSET = (SUBSET & IMG_IN).set_z(IMG_IN)
 
     # creation parameters
-    prm = {
-        'path': OUTPUT,
-        'nrow': ss.sy,
-        'ncol': ss.sx,
-        'nband': imi.sz,
-        'dtype': imi.dtype,
-        'nodata': imi.nodata,
-        'options': FOPTS.getOptions(),
+    PARAM = {
+        'path':   OUTPUT,
+        'nrow':   SUBSET.size.y,
+        'ncol':   SUBSET.size.x,
+        'nband':  IMG_IN.size.z,
+        'dtype':  IMG_IN.dtype,
+        'nodata': IMG_IN.nodata,
+        'options' : FOPTS.options,
     }
-
-    # geocoding
-    if imi.ds.GetProjection():
-        # get the original transformation matrix
-        tmtx0 = imi.ds.GetGeoTransform()
-
-        # calculate the new offset of the origin
-        ox = tmtx0[0] + tmtx0[1] * ss.ox + tmtx0[2] * ss.oy
-        oy = tmtx0[3] + tmtx0[4] * ss.ox + tmtx0[5] * ss.oy
-
-        # new transformation matrix
-        tmtx1 = [ox, tmtx0[1], tmtx0[2], oy, tmtx0[4], tmtx0[5]]
-
-        prm['proj'] = imi.ds.GetProjection()
-        prm['geotrn'] = tmtx1
-
-    elif imi.ds.GetGCPProjection():
-        # instantiate tiepoint offsetter function for current offset value
-        tpOff = tiepointOffsetter((ss.ox, ss.oy))
-
-        prm['proj'] = imi.ds.GetGCPProjection()
-        prm['gcps'] = [tpOff(p) for p in imi.ds.GetGCPs()]
-
+    # add translated geo-coding
+    PARAM.update(
+        pixel_offset(IMG_IN.geocoding, (SUBSET.offset.x, SUBSET.offset.y))
+    )
 
     # open output image
-    imo = ib.createGeoTIFF(**prm)
+    IMG_OUT = create_geotiff(**PARAM)
 
-    #--------------------------------------------------------------------------
-
-    BSX = 256 # X block size
-    BSY = 256 # Y block size
-
-    # allocate image block
-    bi = ib.ImgBlock(imi.dtype, (BSX, BSY, imi.sz))
-
-    # initialize progress printer
-    prg = iu.Progress((1+(imo.sy-1)/BSY)*(1+(imo.sx-1)/BSX))
+    # block size
+    TILE_SIZE = (int(FOPTS["BLOCKXSIZE"]), int(FOPTS["BLOCKYSIZE"]))
 
     print "Extracting image subset..."
-
-    for tr in xrange(1 + (imo.sy-1)/BSY):
-        for tc in xrange(1 + (imo.sx-1)/BSX):
-            bi.fill(NODATA) # fill block by no-data value
-            bi.move_to(tc*BSX + ss.ox, tr*BSY + ss.oy) # input image offset
-            imi.read(bi) # load image block
-            bi.move_to(tc*BSX, tr*BSY) # change offset
-            imo.write(bi) # save image block
-            printout(prg.istr(1)) # print progress
-
-    printout("\n")
+    execute(
+        IMG_OUT.tiles(TILE_SIZE), process, (IMG_IN, IMG_OUT, SUBSET),
+        progress=Progress(sys.stdout, IMG_OUT.tile_count(TILE_SIZE)),
+    )

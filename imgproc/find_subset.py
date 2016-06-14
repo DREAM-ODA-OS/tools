@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 #-------------------------------------------------------------------------------
 #
-#  This tool takes a mask calculated by the extract_mask
-#  and search the minimum subset of the image contaning 
-#  the valid pixel. 
-#  The extent of this subset is returned as pixel offset and size. 
+#  This tool takes a mask and searches the minimum subset of the image
+#  containing all the valid pixel. The extent of this subset is then returned
+#  as pixel offset and size.
 #
 #  As output the command writes 4 comma separated integers values:
 #
@@ -36,89 +35,56 @@
 #-------------------------------------------------------------------------------
 
 import sys
-import os.path
-import img_block as ib
-import numpy as np
+from os.path import basename
+from numpy import dtype
+from img import ImageFileReader, Block
+from img.algs import get_data_extent
+from img.cli import error
 
-def getDataExtent(bi, nodata):
+def usage():
+    """ Print simple usage help. """
+    exename = basename(sys.argv[0])
+    print >>sys.stderr, "USAGE: %s <input image mask> <no data value>" % exename
+    print >>sys.stderr, "EXAMPLE: %s mask.tif 0" % exename
 
-    # X coordinate
-    xmin = bi.ux
-    xmax = bi.ox
-    for i in xrange(bi.sx): # find X minimum
-        # get count of valid pixels
-        s = np.sum(bi.data[:, i, 0] != nodata)
-        if s > 0:
-            xmin = bi.ox + i
-            break
 
-    for i in xrange(bi.sx-1, xmin-bi.ox-1, -1): # find X maximum
-        # get count of valid pixels
-        s = np.sum(bi.data[:, i, 0] != nodata)
-        if s > 0:
-            xmax = bi.ox + i + 1
-            break
+def format_subset(subset):
+    """ Format the subset extent. """
+    return  "%d,%d,%d,%d" % (
+        subset.offset.x, subset.offset.y, subset.size.x, subset.size.y,
+    )
 
-    if xmax < xmin:
-        xmax = xmin + 1
-    if xmax > bi.ux:
-        xmax = bi.ux
 
-    if xmin >= bi.ux: # no data found - the image is empty
-        return ib.ImgExtent((0, 0, imi.sz), (bi.ox, bi.oy, 0))
-
-    # Y coordinate
-    ymin = bi.uy
-    ymax = bi.oy
-    for i in xrange(bi.sy): # find Y minimum
-        # get count of valid pixels
-        s = np.sum(bi.data[i, :, 0] != nodata)
-        if s > 0:
-            ymin = bi.oy + i
-            break
-
-    for i in xrange(bi.sy-1, ymin-bi.oy-1, -1): # find Y maximum
-        # get count of valid pixels
-        s = np.sum(bi.data[i, :, 0] != nodata)
-        if s > 0:
-            ymax = bi.oy + i + 1
-            break
-
-    if ymax < ymin:
-        ymax = ymin + 1
-    if ymax > bi.uy:
-        ymax = bi.uy
-
-    return ib.ImgExtent((xmax-xmin, ymax-ymin, imi.sz), (xmin, ymin, 0))
+def process(tile, img_in, nodata_value):
+    """ Single tile process. """
+    tile = tile & img_in # clip tile to the image extent
+    return get_data_extent(img_in.read(Block(img_in.dtype, tile)), nodata_value)
 
 
 if __name__ == "__main__":
-    # TODO: to improve CLI
-    EXENAME = os.path.basename(sys.argv[0])
-
+    ALLOWED_DTYPES = ('uint8', 'uint16', 'uint32', 'int8', 'int16', 'int32')
     try:
         INPUT = sys.argv[1]
         NODATA = sys.argv[2]
-
     except IndexError:
-        sys.stderr.write("Not enough input arguments!\n")
-        sys.stderr.write("USAGE: %s <input image mask> <no data value>\n"%EXENAME)
-        sys.stderr.write("EXAMPLE: %s mask.tif 0\n"%EXENAME)
+        error("Not enough input arguments!")
+        usage()
         sys.exit(1)
 
     # open input image
-    imi = ib.ImgFileIn(INPUT)
+    IMG_IN = ImageFileReader(INPUT)
+
+    # check mask properties
+    if IMG_IN.size.z > 1:
+        error("Multi-band masks are not supported!")
+        sys.exit(1)
+
+    if IMG_IN.dtype not in ALLOWED_DTYPES:
+        error("Unsupported mask data type '%s'!" % IMG_IN.dtype)
+        sys.exit(1)
 
     # convert no-data values to the image's data type
-    NODATA = np.dtype(imi.dtype).type(NODATA)
+    NODATA = dtype(IMG_IN.dtype).type(NODATA)
 
-    # load the mask as single image
-    bi = ib.ImgBlock('uint8', (imi.sx, imi.sy, 1))
-
-    # load image block
-    imi.read(bi)
-
-    # extract subset
-    subset = getDataExtent(bi, NODATA)
-
-    print  "%d,%d,%d,%d"%(subset.ox, subset.oy, subset.sx, subset.sy)
+    # extract and print the subset
+    print format_subset(process(IMG_IN, IMG_IN, NODATA))

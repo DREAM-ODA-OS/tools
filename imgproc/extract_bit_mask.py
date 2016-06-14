@@ -1,10 +1,10 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 #------------------------------------------------------------------------------
-# 
-#   This tool extracts a single bit-mask plane (as a 'byte' mask) from
-#   a bit-flasg image. 
 #
-# Project: Image Processing Tools 
+#   This tool extracts a single bit-mask plane (as a 'byte' mask) from
+#   a bit-flag image.
+#
+# Project: Image Processing Tools
 # Authors: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
@@ -13,8 +13,8 @@
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
-# copies of the Software, and to permit persons to whom the Software is 
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
 #
 # The above copyright notice and this permission notice shall be included in all
@@ -29,130 +29,90 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
-import sys 
-import os.path 
-import img_block as ib 
-import img_util as iu
-import numpy as np 
+import sys
+from os.path import basename
+from img import (
+    FormatOptions, ImageFileReader, create_geotiff, DEF_GEOTIFF_FOPT,
+    Progress, Block, execute,
+)
+from img.algs import extract_bit_mask
+from img.cli import error
 
-#------------------------------------------------------------------------------
-# mask extractor 
-def extractBitMask( bi, bmask, bg=0x00, fg=0xFF ) :
+MASKBG = 0x00
+MASKFG = 0xFF
 
-    if ( bi.sz != 1 ) : 
-        raise RuntimeError("Invalid band count! sz=%d ",bi.sz) 
+def usage():
+    """ Print simple usage help. """
+    exename = basename(sys.argv[0])
+    print >>sys.stderr, (
+        "USAGE: %s <input image> <output mask/TIF> <bitwise-and-mask> "
+        " [EQUAL]" % exename
+    )
+    print >>sys.stderr, "EXAMPLE: %s input.tif mask.tif 128" % exename
+    print >>sys.stderr, "EXAMPLE: %s input.tif mask.tif 12 EQUAL" % exename
 
-    # output block 
-    bo = ib.ImgBlock('uint8',size=(bi.sx,bi.sy,1), offset=(bi.ox,bi.oy,0))
 
-    tmp = ( 0 == np.bitwise_and( bi.data[:,:,0] , bmask ) ) 
+def process(tile, img_in, img_out, value, equal):
+    """ Process one tile. """
+    tile = tile & img_out # clip tile to the image extent
+    b_in = img_in.read(Block(img_in.dtype, tile))
+    b_mask = extract_bit_mask(b_in, value, equal)
+    b_out = replace_bool(b_mask, MASKBG, MASKFG, 'uint8')
+    img_out.write(b_out)
 
-    bo.data[:,:,0] = tmp*bg + np.logical_not(tmp)*fg  
 
-    return bo 
-
-#------------------------------------------------------------------------------
-
-if __name__ == "__main__" : 
-
-    # TODO: to improve CLI 
-
-    EXENAME = os.path.basename( sys.argv[0] ) 
-
-    def error( message ) :
-        print >>sys.stderr, "ERROR: %s: %s\n" %( EXENAME, message ) 
-
-    # block size 
-    bsx , bsy = 256, 256 
-
-    # default format options 
-
-    FOPTS = ib.FormatOptions() 
-    FOPTS["TILED"] = "YES"
-    FOPTS["BLOCKXSIZE"] = "256"
-    FOPTS["BLOCKYSIZE"] = "256"
-    FOPTS["COMPRESS"] = "DEFLATE"
-
-    try: 
-
+if __name__ == "__main__":
+    ALLOWED_DTYPES = ('uint8', 'uint16', 'uint32', 'int8', 'int16', 'int32')
+    FOPTS = FormatOptions(DEF_GEOTIFF_FOPT) # default format options
+    EQUAL = False
+    MASKBG = 0x00
+    MASKFG = 0xFF
+    try:
         INPUT = sys.argv[1]
         OUTPUT = sys.argv[2]
-        BMASK  = sys.argv[3]
-        MASKBG = 0x00 
-        MASKFG = 0xFF 
+        VALUE = int(sys.argv[3])
+        for opt in sys.argv[4:]:
+            if opt.upper() == "EQUAL":
+                EQUAL = True
+            else:
+                #anything else is treated as a format option
+                FOPTS.set_option(opt)
+    except IndexError:
+        error("Not enough input arguments!")
+        usage()
+        sys.exit(1)
 
-        #anything else treated as a format option
-        for opt in sys.argv[4:] :
-            FOPTS.setOption( opt )
+    # open input image
+    IMG_IN = ImageFileReader(INPUT)
 
-    except IndexError : 
-        error("Not enough input arguments!") 
-        sys.stderr.write("USAGE: %s <input image> <output mask/TIF> <bit-wise and mask>\n"%EXENAME) 
-        sys.stderr.write("EXAMPLE: %s input.tif mask.tif 128\n"%EXENAME) 
-        sys.exit(1) 
+    # check mask properties
+    if IMG_IN.size.z > 1:
+        error("Multi-band bit-masks are not supported!")
+        sys.exit(1)
 
+    if IMG_IN.dtype not in ALLOWED_DTYPES:
+        error("Unsupported bit-mask data type '%s'!" % IMG_IN.dtype)
+        sys.exit(1)
 
-    # open input image 
-    imi = ib.ImgFileIn( INPUT ) 
-
-    if imi.sz > 1 : 
-        error("ERROR: Multiband images not supported!") 
-        sys.exit(1) 
-
-    if imi.dtype not in ('uint8','uint16','uint32','int8','int16','int32') : 
-        error("ERROR: Unsupported image data type '%s'!"%imi.dtype) 
-        sys.exit(1) 
-
-    # convert bit mask values to the image's data type 
-    BMASK = map( np.dtype(imi.dtype).type, BMASK ) 
-
-    # creation parameters 
-    prm = { 
+    # creation parameters
+    PARAM = {
         'path' :   OUTPUT,
-        'nrow' :   imi.sy,
-        'ncol' :   imi.sx,
+        'nrow' :   IMG_IN.size.y,
+        'ncol' :   IMG_IN.size.x,
         'nband' :  1,
         'dtype' :  'uint8',
-        'options' : FOPTS.getOptions(),
-    } 
+        'options' : FOPTS.options,
+    }
+    PARAM.update(IMG_IN.geocoding) # add geo-coding
 
-    #print prm 
+    # open output image
+    IMG_OUT = create_geotiff(**PARAM)
 
-    # geocoding 
-    if imi.ds.GetProjection() : 
-        prm['proj'] = imi.ds.GetProjection()
-        prm['geotrn'] = imi.ds.GetGeoTransform()
-    elif imi.ds.GetGCPProjection() : 
-        prm['proj'] = imi.ds.GetGCPProjection()
-        prm['gcps'] = imi.ds.GetGCPs()
+    # block size
+    TILE_SIZE = (int(FOPTS["BLOCKXSIZE"]), int(FOPTS["BLOCKYSIZE"]))
 
-    # open output image 
-    imo = ib.createGeoTIFF( **prm ) 
-
-    # initialize progress printer 
-    prg = iu.Progress( (1+(imi.sy-1)/bsy)*(1+(imi.sx-1)/bsx) ) 
-
-    print "Extracting bit flag as a mask ..."
-
-    for ty in xrange( 1 + (imi.sy-1)/bsy ) :
-        for tx in xrange( 1 + (imi.sx-1)/bsx ) :
-
-            # extent of the tile 
-            ex_t = imi & ib.ImgExtent( (bsx,bsy,imi.sz) , (tx*bsx,ty*bsy,0) )
-
-            # allocate input image block 
-            bi = ib.ImgBlock( imi.dtype , extent = ex_t ) 
-
-            # load image block 
-            imi.read( bi ) 
-
-            # calculate the mask 
-            bo = extractBitMask( bi, BMASK , MASKBG, MASKFG ) 
-
-            # save image block 
-            imo.write( bo ) 
-
-            # print progress 
-            sys.stdout.write(prg.istr(1)) ; sys.stdout.flush() 
-
-    sys.stdout.write("\n") ; sys.stdout.flush() 
+    print "Extracting bit-flags as a mask ..."
+    execute(
+        IMG_OUT.tiles(TILE_SIZE), process, (IMG_IN, IMG_OUT, VALUE, EQUAL),
+        progress=Progress(sys.stdout, IMG_OUT.tile_count(TILE_SIZE)),
+    )

@@ -1,12 +1,12 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 #------------------------------------------------------------------------------
-# 
-#   This tool extracts a data/no-data mask from the provided raster image.
-#   The input image can be in arbitrary image format supported by GDAL 
-#   the output will be always produced as GeoTIFF (or TIFF if no geocoding
-#   available). 
 #
-# Project: Image Processing Tools 
+#   This tool extracts a valid data mask from the provided raster image.
+#   The input image can be in arbitrary image format supported by GDAL
+#   The output will be always produced in  GeoTIFF (or TIFF if no geo-coding
+#   available) format.
+#
+# Project: Image Processing Tools
 # Authors: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
@@ -15,8 +15,8 @@
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
-# copies of the Software, and to permit persons to whom the Software is 
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
 #
 # The above copyright notice and this permission notice shall be included in all
@@ -31,160 +31,89 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
-import sys 
-import os.path 
-import img_block as ib 
-import img_util as iu
-import numpy as np 
+import sys
+from os.path import basename
+from numpy import dtype
+from img import (
+    FormatOptions, ImageFileReader, create_geotiff, DEF_GEOTIFF_FOPT,
+    Progress, Block, execute,
+)
+from img.algs import extract_mask, replace_bool
+from img.cli import error
 
-#------------------------------------------------------------------------------
-# mask extractor 
-def extractMaskAll( bi, nodata, bg=0x00, fg=0xFF ) :
-    
-    # output block 
-    bo = ib.ImgBlock('uint8',size=(bi.sx,bi.sy,1), offset=(bi.ox,bi.oy,0))
+MASKBG = 0x00
+MASKFG = 0xFF
 
-    # prepare list of no-data values 
-    if len( nodata ) == 1 : 
-        nodata = [ nodata[0] for i in xrange(bi.data.shape[2]) ] 
+def usage():
+    """ Print simple usage help. """
+    exename = basename(sys.argv[0])
+    print >>sys.stderr, (
+        "USAGE: %s <input image> <output mask/TIF> <no data values> "
+        "[ALL_VALID|ANY_VALID]" % exename
+    )
+    print >>sys.stderr, "EXAMPLE: %s input.tif mask.tif 0,0,0,0" % exename
+    print >>sys.stderr, "EXAMPLE: %s input.tif mask.tif 0 ALL_VALID" % exename
 
-    # temporary array - evaluates to True for no-data values 
 
-    tmp = np.ones( bi.data.shape[:2] , 'bool' ) 
-    for i in xrange( bi.data.shape[2] ) : 
-        tmp &= ( bi.data[:,:,i] == nodata[i] ) 
+def process(tile, img_in, img_out, nodata, all_valid):
+    """ Process one tile. """
+    tile = (tile & img_out).set_z(img_in) # clip tile to the image extent
+    b_in = img_in.read(Block(img_in.dtype, tile))
+    b_mask = extract_mask(b_in, nodata, all_valid)
+    b_out = replace_bool(b_mask, MASKBG, MASKFG, 'uint8')
+    img_out.write(b_out)
 
-    # set the final array 
 
-    bo.data[:,:,0] = tmp*bg + np.logical_not(tmp)*fg  
-
-    return bo 
-
-def extractMaskAny( bi, nodata, bg=0x00, fg=0xFF ) :
-    
-    # output block 
-    bo = ib.ImgBlock('uint8',size=(bi.sx,bi.sy,1), offset=(bi.ox,bi.oy,0))
-
-    # prepare list of no-data values 
-    if len( nodata ) == 1 : 
-        nodata = [ nodata[0] for i in xrange(bi.data.shape[2]) ] 
-
-    # temporary array - evaluates to True for no-data values 
-
-    tmp = np.zeros( bi.data.shape[:2] , 'bool' ) 
-    for i in xrange( bi.data.shape[2] ) : 
-        tmp |= ( bi.data[:,:,i] == nodata[i] ) 
-
-    # set the final array 
-
-    bo.data[:,:,0] = tmp*bg + np.logical_not(tmp)*fg  
-
-    return bo 
-
-#------------------------------------------------------------------------------
-
-if __name__ == "__main__" : 
-
-    # TODO: to improve CLI 
-
-    EXENAME = os.path.basename( sys.argv[0] ) 
-    MODE_IS_ALL=True 
-    # block size 
-    bsx , bsy = 256, 256 
-
-    # default format options 
-
-    FOPTS = ib.FormatOptions() 
-    FOPTS["TILED"] = "YES"
-    FOPTS["BLOCKXSIZE"] = "256"
-    FOPTS["BLOCKYSIZE"] = "256"
-    FOPTS["COMPRESS"] = "DEFLATE"
-
-    try: 
-
+if __name__ == "__main__":
+    FOPTS = FormatOptions(DEF_GEOTIFF_FOPT) # default format options
+    ALL_VALID = False
+    try:
         INPUT = sys.argv[1]
         OUTPUT = sys.argv[2]
-        NODATA0 = sys.argv[3].split(",")
-        MASKBG = 0x00 
-        MASKFG = 0xFF 
+        NODATA = sys.argv[3].split(",")
+        for opt in sys.argv[4:]:
+            if opt.upper() == "ALL_VALID":
+                ALL_VALID = True
+            elif opt.upper() == "ANY_VALID":
+                ALL_VALID = False
+            elif opt.upper() in ("MODE=ALL", "MODE=ANY"):
+                raise ValueError("Invalid option %r!" % opt)
+            else:
+                #anything else is treated as a format option
+                FOPTS.set_option(opt)
+    except IndexError:
+        error("Not enough input arguments!")
+        usage()
+        sys.exit(1)
 
-        #anything else treated as a format option
-        for opt in sys.argv[4:] :
-            if opt.upper() == "MODE=ALL" : 
-                MODE_IS_ALL=True 
-            elif opt.upper() == "MODE=ANY" : 
-                MODE_IS_ALL=False
-            else : 
-                FOPTS.setOption( opt )
+    # open input image
+    IMG_IN = ImageFileReader(INPUT)
 
-    except IndexError : 
-        
-        sys.stderr.write("Not enough input arguments!\n") 
-        sys.stderr.write("USAGE: %s <input image> <output mask/TIF> <no data value or list>\n"%EXENAME) 
-        sys.stderr.write("EXAMPLE: %s input.tif mask.tif 0,0,0,0\n"%EXENAME) 
-        sys.stderr.write("EXAMPLE: %s input.tif mask.tif 0\n"%EXENAME) 
-        sys.exit(1) 
+    # convert no-data values to the image's data type
+    if len(NODATA) == 1 and len(IMG_IN) > 1:
+        NODATA = NODATA * len(IMG_IN)
+    NODATA = [dtype(dt).type(nd) for dt, nd in zip(IMG_IN.dtypes, NODATA)]
+    DTYPE = IMG_IN.dtype
 
-
-    # open input image 
-    imi = ib.ImgFileIn( INPUT ) 
-
-    # convert no-data values to the image's data type 
-    NODATA = map( np.dtype(imi.dtype).type, NODATA0 ) 
-
-    # creation parameters 
-    prm = { 
+    # creation parameters
+    PARAM = {
         'path' :   OUTPUT,
-        'nrow' :   imi.sy,
-        'ncol' :   imi.sx,
+        'nrow' :   IMG_IN.size.y,
+        'ncol' :   IMG_IN.size.x,
         'nband' :  1,
         'dtype' :  'uint8',
-        'options' : FOPTS.getOptions(),
-    } 
+        'options' : FOPTS.options,
+    }
+    PARAM.update(IMG_IN.geocoding) # add geo-coding
 
-    #print prm 
+    # open output image
+    IMG_OUT = create_geotiff(**PARAM)
 
-    # geocoding 
-    if imi.ds.GetProjection() : 
-        prm['proj'] = imi.ds.GetProjection()
-        prm['geotrn'] = imi.ds.GetGeoTransform()
-    elif imi.ds.GetGCPProjection() : 
-        prm['proj'] = imi.ds.GetGCPProjection()
-        prm['gcps'] = imi.ds.GetGCPs()
-
-    # open output image 
-    imo = ib.createGeoTIFF( **prm ) 
-
-    # mode of mask extraction - all bands equal / any band equals to no-data
-    if MODE_IS_ALL : 
-        extractMask = extractMaskAll
-    else : 
-        extractMask = extractMaskAny
-
-    # initialize progress printer 
-    prg = iu.Progress( (1+(imi.sy-1)/bsy)*(1+(imi.sx-1)/bsx) ) 
+    # block size
+    TILE_SIZE = (int(FOPTS["BLOCKXSIZE"]), int(FOPTS["BLOCKYSIZE"]))
 
     print "Extracting data mask ..."
-
-    for ty in xrange( 1 + (imi.sy-1)/bsy ) :
-        for tx in xrange( 1 + (imi.sx-1)/bsx ) :
-
-            # extent of the tile 
-            ex_t = imi & ib.ImgExtent( (bsx,bsy,imi.sz) , (tx*bsx,ty*bsy,0) )
-
-            # allocate input image block 
-            bi = ib.ImgBlock( imi.dtype , extent = ex_t ) 
-
-            # load image block 
-            imi.read( bi ) 
-
-            # calculate the mask 
-            bo = extractMask( bi, NODATA , MASKBG, MASKFG ) 
-
-            # save image block 
-            imo.write( bo ) 
-
-            # print progress 
-            sys.stdout.write(prg.istr(1)) ; sys.stdout.flush() 
-
-    sys.stdout.write("\n") ; sys.stdout.flush() 
+    execute(
+        IMG_OUT.tiles(TILE_SIZE), process, (IMG_IN, IMG_OUT, NODATA, ALL_VALID),
+        progress=Progress(sys.stdout, IMG_OUT.tile_count(TILE_SIZE)),
+    )

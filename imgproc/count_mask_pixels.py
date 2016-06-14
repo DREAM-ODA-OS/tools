@@ -1,9 +1,9 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 #------------------------------------------------------------------------------
-# 
+#
 #   Extract pixel count.
 #
-# Project: Image Processing Tools 
+# Project: Image Processing Tools
 # Authors: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
@@ -12,8 +12,8 @@
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
-# copies of the Software, and to permit persons to whom the Software is 
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
 #
 # The above copyright notice and this permission notice shall be included in all
@@ -28,119 +28,76 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
-import sys 
-import os.path 
-import img_block as ib 
-import numpy as np 
-import math as m 
-from osgeo import ogr ; ogr.UseExceptions() 
-from osgeo import osr ; ogr.UseExceptions() 
-from osgeo import gdal ; gdal.UseExceptions() 
+import sys
+from os.path import basename
+from img import ImageFileReader, Progress, Block, aggregate, Point2
+from img.algs import count_mask_pixels
+from img.cli import error
 
-#------------------------------------------------------------------------------
+def usage():
+    """Print a short command usage help."""
+    exename = basename(sys.argv[0])
+    print >>sys.stderr, (
+        "USAGE: %s <input image> <data-value> [EQUAL] [AND] [ALL]" % exename
+    )
 
-#------------------------------------------------------------------------------
-# pixel counters 
 
-def countPixelsEQL( bi, value ):
-    return np.sum( bi.data[:,:,0] == value ) 
+def process(tile, img_mask, value, equal, bitwise_and):
+    """ Process one tile. """
+    tile = tile & img_mask # clip tile to the image extent
+    b_mask = img_mask.read(Block(img_mask.dtype, tile))
+    return count_mask_pixels(b_mask, value, equal, bitwise_and)
 
-def countPixelsAND( bi, value ):
-    return np.sum( ( bi.data[:,:,0] & value ) != 0 ) 
 
-#------------------------------------------------------------------------------
-
-if __name__ == "__main__" : 
-
-    # TODO: to improve CLI 
-
-    EXENAME = os.path.basename( sys.argv[0] ) 
-
-    DEBUG=False 
-    OPERATOR="EQL"
-    OPERATORS=("EQL","AND","ALL")
-
-    try: 
-
+if __name__ == "__main__":
+    ALLOWED_OPTIONS = set(("EQUAL", "AND", "ALL"))
+    OPTIONS = set()
+    VALUE = None
+    DEBUG = False
+    try:
         INPUT = sys.argv[1]
-        VALUE = int( sys.argv[2] ) 
-        NP = 2 
-        if len(sys.argv) > NP : 
-            for arg in sys.argv[NP:] : 
-                if ( arg in OPERATORS ) : OPERATOR = arg # match operator 
-                elif ( arg == "DEBUG" ) : DEBUG = True # dump debuging output
+        for arg in sys.argv[2:]:
+            if arg in ALLOWED_OPTIONS:
+                OPTIONS.add(arg)
+            elif arg == "DEBUG":
+                DEBUG = True
+            elif VALUE is None:
+                VALUE = int(arg)
+    except IndexError:
+        error("Not enough input arguments!")
+        usage()
+        sys.exit(1)
 
-    except IndexError : 
-        
-        sys.stderr.write("\nCount pixels.\n\n") 
-        sys.stderr.write("Not enough input arguments!\n") 
-        sys.stderr.write("USAGE: %s <input image> <data-value> [AND|EQL*] [DEBUG]\n"%EXENAME) 
-        sys.exit(1) 
-
-    #--------------------------------------------------------------------------
-
-    # open input image 
-    imi = ib.ImgFileIn( INPUT ) 
-
-    # check input image 
-
-    if imi.sz > 1 : 
-        sys.stderr.write( "ERROR: %s: Multiband images not supported!" \
-                          "\n"%(EXENAME) ) 
-        sys.exit(1) 
-
-    if imi.dtype not in ('uint8','int8','uint16','int16','uint32','int32') : 
-        sys.stderr.write( "ERROR: %s: Unsupported image data type '%s'!" \
-                          "\n"%(EXENAME,imi.dtype) ) 
-        sys.exit(1) 
-
-    #--------------------------------------------------------------------------
+    if "ALL" in OPTIONS:
+        OPTIONS = set(("ALL",))
+        VALUE = None
 
     if DEBUG:
-        print >>sys.stderr, "OPERATOR:" , OPERATOR 
-        print >>sys.stderr, "VALUE:   " , VALUE
+        print >>sys.stderr, "INPUT:   %s" % INPUT
+        print >>sys.stderr, "OPTIONS: %s" % " ".join(OPTIONS)
+        print >>sys.stderr, "VALUE:   %s" % VALUE
 
-    if OPERATOR == "EQL" :
-        countPixels = countPixelsEQL
-    elif OPERATOR == "AND" :
-        countPixels = countPixelsAND
-    elif OPERATOR == "ALL" :
-        print ( imi.sx * imi.sy ) 
-        sys.exit(0) 
-    else: 
-        sys.stderr.write( "ERROR: %s: Unsupported operator! OPERATOR='%s'!" \
-                          "\n"%(EXENAME,OPERATOR) ) 
-        sys.exit(1) 
+    # open the mask image
+    IMG_MASK = ImageFileReader(INPUT)
 
-    #--------------------------------------------------------------------------
-    bsx , bsy = 256,256 
+    # check mask properties
+    if IMG_MASK.size.z > 1:
+        error("Multi-band masks are not supported!")
+        sys.exit(1)
 
-    count = 0 
+    if IMG_MASK.dtype != 'uint8':
+        error("Unsupported mask data type '%s'!" % IMG_MASK.dtype)
+        sys.exit(1)
 
-    for ty in xrange( 1 + (imi.sy-1)/bsy ) :
-        for tx in xrange( 1 + (imi.sx-1)/bsx ) :
+    print >>sys.stderr, "Counting pixels ..."
 
-            if DEBUG:
-                sys.stderr.write("#")
-                sys.stderr.flush() 
-
-            # extent of the tile 
-            ex_t = imi & ib.ImgExtent( (bsx,bsy,imi.sz) , (tx*bsx,ty*bsy,0) )
-
-            # allocate input image block 
-            bi = ib.ImgBlock( imi.dtype , extent = ex_t ) 
-
-            # load image block 
-            imi.read( bi ) 
-
-            # count pixels
-            count += countPixels( bi, VALUE ) 
-
-            # save image block 
-            #imo.write( bo ) 
-
-        if DEBUG:
-            sys.stderr.write("\n")
-            sys.stderr.flush() 
-
-    print count 
+    if "ALL" in OPTIONS:
+        print Point2(IMG_MASK.size).prod()
+    else:
+        TILE_SIZE = (256, 256)
+        print aggregate(
+            IMG_MASK.tiles(TILE_SIZE), process,
+            lambda value, memo: memo + value, 0,
+            (IMG_MASK, VALUE, "EQUAL" in OPTIONS, "AND" in OPTIONS),
+            progress=Progress(sys.stderr, IMG_MASK.tile_count(TILE_SIZE)),
+        )

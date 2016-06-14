@@ -30,7 +30,6 @@
 
 import sys 
 import os.path 
-import img_block as ib 
 import img_geom as ig 
 #import numpy as np 
 #import math as m 

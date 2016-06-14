@@ -27,22 +27,20 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
+#pylint: disable=invalid-name
 
 import sys
 import os.path
-import img_block as ib
+from osgeo import ogr ; ogr.UseExceptions() #pylint: disable=multiple-statements
+from osgeo import osr ; ogr.UseExceptions() #pylint: disable=multiple-statements
+from osgeo import gdal ; gdal.UseExceptions() #pylint: disable=multiple-statements
+from img import ImageFileReader
 import img_geom as ig
-#import numpy as np
-#import math as m
-from osgeo import ogr ; ogr.UseExceptions()
-from osgeo import osr ; ogr.UseExceptions()
-from osgeo import gdal ; gdal.UseExceptions()
 
 if __name__ == "__main__":
-    # TODO: to improve CLI
     EXENAME = os.path.basename(sys.argv[0])
-    DEBUG=False
-    FORMAT="WKB"
+    DEBUG = False
+    FORMAT = "WKB"
     AND = False
 
     try:
@@ -50,9 +48,10 @@ if __name__ == "__main__":
         NP = 1
         if len(sys.argv) > NP:
             for arg in sys.argv[NP:]:
-                if (arg in ig.OUTPUT_FORMATS): FORMAT=arg # output format
-                elif (arg == "DEBUG"): DEBUG = True # dump debuging output
-
+                if arg in ig.OUTPUT_FORMATS:
+                    FORMAT = arg # output format
+                elif arg == "DEBUG":
+                    DEBUG = True # dump debuging output
     except IndexError:
         print >>sys.stderr, "ERROR: Not enough input arguments!"
         print >>sys.stderr, "\nExtract image extent as a rectange polygon."
@@ -65,14 +64,14 @@ if __name__ == "__main__":
     #--------------------------------------------------------------------------
 
     # open input image
-    imi = ib.ImgFileIn(INPUT)
+    imi = ImageFileReader(INPUT)
+    geocoding = imi.geocoding
+    size_x, size_y = imi.size.x, imi.size.y
 
-    # has geocoding?
-    if imi.ds.GetProjection():
+    if 'geotrn' in geocoding:
         # get the transformation matrix
-        x0, dxx, dxy, y0, dyx, dyy = imi.ds.GetGeoTransform()
-        sr = osr.SpatialReference(imi.ds.GetProjection())
-        #print "PROJECTION: ", imi.ds.GetProjection()
+        x0, dxx, dxy, y0, dyx, dyy = geocoding['geotrn']
+        sr = osr.SpatialReference(geocoding['proj'])
     else:
         # operate in image coordinate space
         x0, dxx, dxy, y0, dyx, dyy = 0.0, 1.0, 0.0, 0.0, 0.0, 1.0
@@ -80,8 +79,8 @@ if __name__ == "__main__":
 
     # calculate the corner coordinates
     r = ogr.Geometry(ogr.wkbLinearRing)
-    for x, y in ((0, 0), (imi.sx, 0), (imi.sx, imi.sy), (0, imi.sy)):
-        r.AddPoint_2D(x0+dxx*x+dxy*y, y0+dyx*x+dyy*y)
+    for x, y in [(0, 0), (size_x, 0), (size_x, size_y), (0, size_y)]:
+        r.AddPoint_2D(x0 + dxx*x + dxy*y, y0 + dyx*x + dyy*y)
     r.CloseRings()
 
     # create polygon
@@ -96,6 +95,6 @@ if __name__ == "__main__":
 
     try:
         sys.stdout.write(ig.dumpGeom(geom, FORMAT))
-    except Exception as e:
-        print >>sys.stderr, "ERROR: %s: %s"%(EXENAME, e)
+    except Exception as exc:
+        print >>sys.stderr, "ERROR: %s: %s" % (EXENAME, exc)
         sys.exit(1)

@@ -1,14 +1,19 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 #------------------------------------------------------------------------------
-# 
-#   This tool performs range stretch to 8 bits for given maximum and 
-#   minimum values. The range is stretched beeween 1 and 255. 0 is reserved for
-#   non-data value. 1 contains all values below  to min. 255 contains 
-#   all values larger or eqaual to max. 
 #
-#   Optionally the stretching can be performed in logarithmic (dB) scale. 
+#   This tool performs range stretch to 8 bits for given maximum and
+#   minimum values. The number of output band is restricted to 1 or 3 colour
+#   bands to produce either gray-scale or RGB images. Optionally an alpha
+#   band generated for the given no-data value can be added.
 #
-# Project: Image Processing Tools 
+#   The range is stretched between 1 and 255.
+#   0 is reserved for the non-data value.
+#   1 contains all values below the minimum value.
+#   255 contains all values larger equal to the maximum value.
+#
+#   Optionally the stretching can be performed in the logarithmic scale.
+#
+# Project: Image Processing Tools
 # Authors: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
@@ -17,8 +22,8 @@
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
-# copies of the Software, and to permit persons to whom the Software is 
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
 #
 # The above copyright notice and this permission notice shall be included in all
@@ -33,230 +38,128 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
-import sys 
-import os.path 
-import img_block as ib 
-import img_util as iu
-import numpy as np 
+import sys
+from os.path import basename
+from numpy import dtype
+from img import (
+    FormatOptions, create_geotiff, DEF_GEOTIFF_FOPT,
+    Block, ImageFileReader, Progress, execute,
+)
+from img.cli import error
+from img.algs import range_stretch_uint8, extract_mask
 
-#------------------------------------------------------------------------------
-# range stretch 
-
-def get_nodata_mask( bi, nodata ):  
-
-
-    if nodata is not None : 
-
-        # prepare list of no-data values 
-        if len( nodata ) == 1 : 
-            nodata = [ nodata[0] for i in xrange(bi.data.shape[2]) ] 
-
-        # no-data value mask 
-        mask = np.ones( bi.data.shape[:2] , 'bool' ) 
-        for i in xrange( bi.data.shape[2] ) : 
-            mask &= ( bi.data[:,:,i] == nodata[i] ) 
-
-    else :
-        # all pixels are taken as valid 
-        mask = np.zeros( bi.data.shape[:2] , 'bool' ) 
-
-    return mask 
-
-def add_alpha_channel( bi , mask ) : 
-
-    # output block 
-    bo = ib.ImgBlock('uint8',size=(bi.sx,bi.sy,bi.sz+1), offset=(bi.ox,bi.oy,0))
-
-    bo.data[:,:,:-1] = bi.data 
-    bo.data[:,:,-1]  = np.logical_not(mask) * 255 
-
-    return bo 
-
-def range_stretch_lin( bi, nodata, vmin, vmax , set_alpha = False ) :
-    
-    # output block 
-    bo = ib.ImgBlock('uint8',size=(bi.sx,bi.sy,bi.sz), offset=(bi.ox,bi.oy,0))
-
-    # no-data value mask 
-    mask = get_nodata_mask( bi, nodata )
-
-    # set the final array 
-
-    # scaling 
-    idx = np.logical_not(mask).nonzero()
-    f   = 253.0 / ( vmax - vmin ) 
-    tmp = f*( bi.data[idx] - vmin ) + 2 
-
-    #clipping 
-    tmp[ (tmp<  1).nonzero() ] =   1.
-    tmp[ (tmp>255).nonzero() ] = 255. 
-
-    #store values 
-    bo.data[idx] = tmp 
-
-    # optionally add alpha channel 
-    if set_alpha : 
-        bo = add_alpha_channel( bo , mask )  
-
-    return bo 
+def usage():
+    """Print a short command usage help."""
+    exename = basename(sys.argv[0])
+    print >>sys.stderr, (
+        "USAGE: %s <input image> <output image> <min.value> <max.value> "
+        "<no data value>|NONE [LOGSCALE] [DBSCALE] [ADDALPHA]" % exename
+    )
+    print >>sys.stderr, (
+        "USAGE: %s <input image> <output image> NOSCALE "
+        "<no data value>|NONE [ADDALPHA]" % exename
+    )
+    print >>sys.stderr, (
+        "EXAMPLE: %s input.tif output.tif 10 12000 0,0,0,0" % exename
+    )
+    print >>sys.stderr, "EXAMPLE: %s input.tif output.tif 2 20 0" % exename
 
 
-def range_stretch_db( bi, nodata, vmin, vmax , set_alpha = False ) :
-
-    # output block 
-    bo = ib.ImgBlock('uint8',size=(bi.sx,bi.sy,bi.sz), offset=(bi.ox,bi.oy,0))
-
-    # no-data value mask 
-    mask = get_nodata_mask( bi, nodata )
-
-    # hadle non-positive vlaues 
-    for i in xrange( bi.data.shape[2] ) : 
-        mask |= ( bi.data[:,:,i] <= 0 ) 
-
-    # set the final array 
-
-    # scaling 
-    idx = np.logical_not(mask).nonzero()
-    f   = 253.0 / ( vmax - vmin ) 
-    tmp = f*( (10.*np.log10(bi.data[idx])) - vmin ) + 2 
-
-    #clipping 
-    tmp[ (tmp<  1).nonzero() ] =   1.
-    tmp[ (tmp>255).nonzero() ] = 255. 
-
-    #store values 
-    bo.data[idx] = tmp 
-
-    #fix the non-data values
-    #idx = np.logical_not(mask).nonzero()
-    #bo.data[idx] = 0
-
-    # optionally add alpha channel 
-    if set_alpha : 
-        bo = add_alpha_channel( bo , mask )  
-
-    return bo 
+def process(tile, img_in, img_out, vmin, vmax, nodata, scale, add_alpha):
+    """ Process one tile. """
+    # pylint: disable=too-many-arguments
+    tile = tile & img_out # clip tile to the image extent
+    b_in = Block(img_in.dtype, tile.set_z(img_out.size.z - add_alpha))
+    b_in = img_in.read(b_in)
+    b_mask = extract_mask(b_in, nodata, all_valid=True)
+    b_out = range_stretch_uint8(b_in, b_mask, vmin, vmax, scale, add_alpha)
+    img_out.write(b_out)
 
 
-#------------------------------------------------------------------------------
-
-if __name__ == "__main__" : 
-
-    # TODO: to improve CLI 
-
-    exename = os.path.basename( sys.argv[0] ) 
-    # block size 
-    bsx , bsy = 256, 256 
-    dbscale = False ; 
-    addalpha = False
-    noscale = False 
-
-    # default format options 
-
-    FOPTS = ib.FormatOptions() 
-    FOPTS["TILED"] = "YES"
-    FOPTS["BLOCKXSIZE"] = "256"
-    FOPTS["BLOCKYSIZE"] = "256"
-    FOPTS["COMPRESS"] = "DEFLATE"
-
-    try: 
-
-        INPUT  = sys.argv[1]
+if __name__ == "__main__":
+    FOPTS = FormatOptions(DEF_GEOTIFF_FOPT) # default format options
+    FOPTS['INTERLEAVE'] = 'PIXEL'
+    ADDALPHA = False
+    SCALE = "linear"
+    try:
+        INPUT = sys.argv[1]
         OUTPUT = sys.argv[2]
-        VMIN   = float(sys.argv[3])
-        VMAX   = float(sys.argv[4]) 
-        NODATA0 = sys.argv[5].split(",")
-
-        #anything else than "DB" is treated as a format option
-        for opt in sys.argv[6:] :
-            if opt.upper() == "DB" :
-                dbscale = True 
-            elif opt.upper() == "NOSCALE" :
-                noscale = True 
-            elif opt.upper() == "ADDALPHA" :
-                addalpha = True 
+        if sys.argv[3] == "NOSCALE":
+            SCALE = "identity"
+            POS = 4
+        else:
+            VMIN = sys.argv[3]
+            VMAX = sys.argv[4]
+            POS = 5
+        NODATA = sys.argv[POS]
+        for opt in sys.argv[POS+1:]:
+            if opt.upper() == "LOGSCALE":
+                SCALE = "logarithmic"
+            elif opt.upper() in ("DB", "DBSCALE"):
+                SCALE = "decibel"
+            elif opt.upper() == "NOSCALE":
+                SCALE = "identity"
+            elif opt.upper() == "ADDALPHA":
+                ADDALPHA = True
                 FOPTS["ALPHA"] = "YES"
-            else : 
-                FOPTS.setOption( opt )
+            else:
+                #anything else is treated as a format option
+                FOPTS.set_option(opt)
+    except IndexError:
+        error("Not enough input arguments!")
+        usage()
+        sys.exit(1)
 
-    except IndexError : 
-        sys.stderr.write("Not enough input arguments!\n") 
-        sys.stderr.write("USAGE: %s <input image> <output mask/TIF> <min.> <max.> <no data value or list>\n"%exename) 
-        sys.stderr.write("EXAMPLE: %s input.tif output.tif 10 12000 0,0,0,0\n"%exename) 
-        sys.stderr.write("EXAMPLE: %s input.tif output.tif 2 20 0\n"%exename) 
-        sys.exit(1) 
+    if SCALE == "identity":
+        VMIN = "2"
+        VMAX = "255"
 
-    if noscale:
-        VMIN = 2
-        VMAX = 255
-        dbscale = False
+    # open input image
+    IMG_IN = ImageFileReader(INPUT)
+    NBANDS = 1 if len(IMG_IN) < 3 else 3
 
-    # open input image 
-    imi = ib.ImgFileIn( INPUT ) 
+    VMIN = [float(v) for v in VMIN.split(",")]
+    VMAX = [float(v) for v in VMAX.split(",")]
+    # expand values if needed
+    if len(VMIN) == 1 and NBANDS > 1:
+        VMIN = VMIN * NBANDS
+    if len(VMAX) == 1 and NBANDS > 1:
+        VMAX = VMAX * NBANDS
 
-    # convert no-data values to the image's data type 
+    # convert no-data values to the image's data type
+    if NODATA != "NONE":
+        NODATA = NODATA.split(",")
+        if len(NODATA) == 1 and NBANDS > 1:
+            NODATA = NODATA * NBANDS
+        NODATA = [dtype(dt).type(nd) for dt, nd in zip(IMG_IN.dtypes, NODATA)]
+    else:
+        NODATA = None
 
-    if str(NODATA0[0]).upper() != "NONE" : 
-        NODATA = map( np.dtype(imi.dtype).type, NODATA0 ) 
-    else :
-        NODATA = None 
+    DTYPE = IMG_IN.dtype
 
-    # creation parameters 
-    prm = { 
+    # creation parameters
+    PARAM = {
         'path' :   OUTPUT,
-        'nrow' :   imi.sy,
-        'ncol' :   imi.sx,
-        'nband' :  imi.sz + ( 1 if addalpha else 0 ) ,
+        'nrow' :   IMG_IN.size.y,
+        'ncol' :   IMG_IN.size.x,
+        'nband' :  NBANDS + ADDALPHA,
         'dtype' :  'uint8',
-        'options' : FOPTS.getOptions(),
-        'nodata' : 0,
-    } 
+        'options' : FOPTS.options,
+    }
+    if not ADDALPHA:
+        PARAM['nodata'] = [0] * PARAM['nband']
+    PARAM.update(IMG_IN.geocoding) # add geo-coding
 
-    #print prm 
+    # open output image
+    IMG_OUT = create_geotiff(**PARAM)
 
-    # geocoding 
-    if imi.ds.GetProjection() : 
-        prm['proj'] = imi.ds.GetProjection()
-        prm['geotrn'] = imi.ds.GetGeoTransform()
-    elif imi.ds.GetGCPProjection() : 
-        prm['proj'] = imi.ds.GetGCPProjection()
-        prm['gcps'] = imi.ds.GetGCPs()
-
-    # open output image 
-    imo = ib.createGeoTIFF( **prm ) 
-
-    # stretch the ranges 
-    if noscale:
-        range_stretch = range_stretch_noscale
-    elif dbscale : 
-        range_stretch = range_stretch_db
-    else : 
-        range_stretch = range_stretch_lin
-
-    # initialize progress printer 
-    prg = iu.Progress( (1+(imi.sy-1)/bsy)*(1+(imi.sx-1)/bsx) ) 
+    # block size
+    TILE_SIZE = (int(FOPTS["BLOCKXSIZE"]), int(FOPTS["BLOCKYSIZE"]))
 
     print "Range stretching ..."
-
-    for ty in xrange( 1 + (imi.sy-1)/bsy ) :
-        for tx in xrange( 1 + (imi.sx-1)/bsx ) :
-
-            # extent of the tile 
-            ex_t = imi & ib.ImgExtent( (bsx,bsy,imi.sz) , (tx*bsx,ty*bsy,0) )
-
-            # allocate input image block 
-            bi = ib.ImgBlock( imi.dtype , extent = ex_t ) 
-
-            # load image block 
-            imi.read( bi ) 
-
-            # stretch the ranges 
-            bo = range_stretch( bi , NODATA, VMIN, VMAX, addalpha ) 
-                
-            # save image block 
-            imo.write( bo ) 
-
-            # print progress 
-            sys.stdout.write(prg.istr(1)) ; sys.stdout.flush() 
-
-    sys.stdout.write("\n") ; sys.stdout.flush() 
+    execute(
+        IMG_OUT.tiles(TILE_SIZE), process, (
+            IMG_IN, IMG_OUT, VMIN, VMAX, NODATA, SCALE, ADDALPHA,
+        ),
+        progress=Progress(sys.stdout, IMG_OUT.tile_count(TILE_SIZE)),
+    )

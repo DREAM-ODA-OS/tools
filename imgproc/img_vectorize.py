@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #------------------------------------------------------------------------------
 #
-#   Extract footprint from a referenceable dataset using EOxServer's reftools
+#   Raster geometry vectorization.
 #
 # Project: Image Processing Tools
 # Authors: Martin Paces <martin.paces@eox.at>
@@ -28,43 +28,36 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
-import sys
-from os.path import basename
-from osgeo import gdal
-from img_geom import OUTPUT_FORMATS, OSR_WGS84, setSR, parseGeom, dumpGeom
-from img.cli import error
+from osgeo import ogr; ogr.UseExceptions() # pylint: disable=multiple-statements
+from osgeo import gdal; gdal.UseExceptions() # pylint: disable=multiple-statements
 
-# NOTE: Make sure the eoxserver is in your Python path.
-from eoxserver.processing.gdal import reftools as rt
-
-def usage():
-    """ Print simple usage help. """
-    exename = basename(sys.argv[0])
-    print >>sys.stderr, (
-        "USAGE: %s <input image> [%s]" % (exename, "|".join(OUTPUT_FORMATS))
-    )
-
-
-if __name__ == "__main__":
-    DEBUG = False
-    FORMAT = "WKB"
-    try:
-        INPUT = sys.argv[1]
-        for arg in sys.argv[2:]:
-            if arg in OUTPUT_FORMATS:
-                FORMAT = arg # output format
-            elif arg == "DEBUG":
-                DEBUG = True # dump debugging output
-    except IndexError:
-        error("Not enough input arguments!\n")
-        usage()
-        sys.exit(1)
-
-    # get the referenceable dataset outline
-    #NOTE: It is assumed, that the outline is not wrapped around the date-line.
-    ds = gdal.Open(INPUT)
-    prm = rt.suggest_transformer(ds)
-    geom = setSR(parseGeom(rt.get_footprint_wkt(ds, **prm)), OSR_WGS84)
-
-    # print geometry
-    sys.stdout.write(dumpGeom(geom, FORMAT))
+def vectorize(band, filter_function):
+    """ Vectorize GDAL raster band."""
+    # create virtual in-memory OGR data-source
+    ogr_ds = ogr.GetDriverByName('Memory').CreateDataSource('_in_memory_')
+    # create geometry layer
+    layer = ogr_ds.CreateLayer('footprint', None, ogr.wkbPolygon)
+    # add feature to hold the mask value
+    layer.CreateField(ogr.FieldDefn('DN', ogr.OFTInteger))
+    # extract vector outlines
+    # NOTE: The polygons are already in the projected coordinates!
+    gdal.Polygonize(band, None, layer, 0)
+    # extract geometries and DNs
+    geometries = [
+        (feature.GetGeometryRef().Clone(), feature.GetFieldAsInteger(0))
+        for feature in (
+            layer.GetFeature(idx) for idx in xrange(layer.GetFeatureCount())
+        ) if filter_function(feature.GetFieldAsInteger(0))
+    ]
+    if len(geometries) == 1: # polygon
+        return geometries[0][0]
+    else: # multi-polygon
+        wrapper = ogr.Geometry(ogr.wkbMultiPolygon)
+        dn_set = set()
+        for geometry, dn in geometries:
+            wrapper.AddGeometry(geometry)
+            dn_set.add(dn)
+        # if there are multiple NDs perform union
+        if len(dn_set) > 1:
+            wrapper = wrapper.UnionCascaded()
+        return wrapper
