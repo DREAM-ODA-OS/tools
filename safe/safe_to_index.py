@@ -30,7 +30,7 @@
 import sys
 from sys import stderr
 import json
-from os.path import basename
+from os.path import basename, getsize
 from safe import extract_metadata
 from safe.index import write_metadata
 from util.cli import error
@@ -61,4 +61,6 @@ if __name__ == "__main__":
 
     # extract and print metadata
     with open(input_) as fobj:
-        write_metadata(extract_metadata(fobj, schema), schema)
+        write_metadata(extract_metadata(
+            fobj, schema, name=basename(path), size=getsize(path)
+        ), schema)

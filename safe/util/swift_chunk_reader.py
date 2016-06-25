@@ -35,7 +35,8 @@ class SWIFTChunkReader(ChunkReader):
     """ Test file-based chunk-reader object. """
     RE_CONTENT_RANGE = re.compile(r"^bytes ([0-9]+)-([0-9]+)/([0-9]+)$")
 
-    def __init__(self, swift_conn, container_name, object_name, chunk_size=None):
+    def __init__(self, swift_conn, container_name, object_name,
+                 chunk_size=None, cache=True):
         self._conn = swift_conn
         self._container_name = container_name
         self._object_name = object_name
@@ -45,7 +46,7 @@ class SWIFTChunkReader(ChunkReader):
         size = int(resp_headers['content-length'])
         if resp_headers['accept-ranges'] != "bytes":
             raise ClientException("Server does not accept byte ranges!")
-        super(SWIFTChunkReader, self).__init__(size, chunk_size)
+        super(SWIFTChunkReader, self).__init__(size, chunk_size, cache)
         self.headers = resp_headers
 
     def refresh(self):

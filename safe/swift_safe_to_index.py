@@ -27,6 +27,7 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
+import traceback
 import sys
 from sys import stderr
 import json
@@ -97,4 +98,12 @@ if __name__ == "__main__":
             sys.exit(1)
 
         # extract and print meta-data
-        write_metadata(extract_metadata(fobj, schema), schema)
+        try:
+            write_metadata(extract_metadata(
+                fobj, schema, name=object_name,
+                size=int(fobj.headers['content-length'])
+            ), schema)
+        except Exception as exc:
+            error("Failed to process object! %r", object_name)
+            traceback.print_exc(file=stderr)
+            sys.exit(1)

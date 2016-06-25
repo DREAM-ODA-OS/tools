@@ -27,6 +27,7 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
+import traceback
 import sys
 from sys import stderr, stdin
 import json
@@ -98,4 +99,12 @@ if __name__ == "__main__":
                 error("Unexpected content type! %r", fobj.headers["content-type"])
                 continue
             # extract and print meta-data
-            write_metadata(extract_metadata(fobj, schema), schema)
+            try:
+                write_metadata(extract_metadata(
+                    fobj, schema, name=object_name,
+                    size=int(fobj.headers['content-length'])
+                ), schema)
+            except Exception as exc:
+                error("Failed to process object! %r", object_name)
+                traceback.print_exc(file=stderr)
+                continue

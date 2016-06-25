@@ -32,12 +32,13 @@ class ChunkReader(object):
     """ Base chunk reader class. """
     DEFAULT_CHUNK_SIZE = 1048576 # 1MB default chunk size
 
-    def __init__(self, size, chunk_size=None):
+    def __init__(self, size, chunk_size=None, cache=True):
         self.closed = False
         self._position = 0
         self._size = size
         self._chunk_size = chunk_size or self.DEFAULT_CHUNK_SIZE
         self._chunks = {}
+        self._cache = cache
 
     def get_chunk(self, offset, size):
         """ Get chunk. """
@@ -82,7 +83,11 @@ class ChunkReader(object):
         missing_chunks = set(chunk_range) - set(self._chunks)
         if missing_chunks:
             self.load_chunks(missing_chunks)
-        return "".join(self._chunks[id_] for id_ in chunk_range)
+        data = "".join(self._chunks[id_] for id_ in chunk_range)
+        if not self._cache:
+            self._chunks = {} # flush the chunk cache
+            #print >>stderr, "Cache flushed!"
+        return data
 
     def read(self, size=None):
         """ Read at most size bytes. """

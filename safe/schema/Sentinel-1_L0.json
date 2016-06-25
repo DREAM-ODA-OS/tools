@@ -33,10 +33,8 @@
         },
         {
             "name": "swathIdentifier",
-            "file": "[^/]+/manifest.safe",
-            "extractor" : "XPATH",
-            "type": "LIST_STRING",
-            "xpath": "//{http://www.esa.int/safe/sentinel-1.0}platform/{http://www.esa.int/safe/sentinel-1.0}instrument/{http://www.esa.int/safe/sentinel-1.0}extension/{http://www.esa.int/safe/sentinel-1.0/sentinel-1/sar/level-1}instrumentMode/{http://www.esa.int/safe/sentinel-1.0/sentinel-1/sar/level-1}swath"
+            "extractor" : "CONSTANT",
+            "value" : "UNDEFINED"
         },
         {
             "name": "orbitNumber",
@@ -95,21 +93,9 @@
             "value" : "RAW"
         },
         {
-            "_file": "[^/]+/manifest.safe",
-            "_extractor" : "XPATH",
-            "_type": "STRING",
-            "_xpath": "//{http://www.esa.int/safe/sentinel-1.0/sentinel-1/sar/level-1}standAloneProductInformation/{http://www.esa.int/safe/sentinel-1.0/sentinel-1/sar/level-1}productClass",
-
-            "name": "polarisationMode",
-            "file": "[^/]{14,14}([SD])[^/]*\\.SAFE/",
-            "extractor" : "FILENAME"
-        },
-        {
             "name": "polarisationChannels",
-            "file": "[^/]+/manifest.safe",
-            "extractor" : "XPATH",
-            "type": "LIST_STRING",
-            "xpath": "//{http://www.esa.int/safe/sentinel-1.0/sentinel-1/sar/level-1}standAloneProductInformation/{http://www.esa.int/safe/sentinel-1.0/sentinel-1/sar/level-1}transmitterReceiverPolarisation"
+            "extractor" : "CONSTANT",
+            "value" : "UNDEFINED"
         },
         {
             "name": "footprint",
@@ -124,16 +110,17 @@
             "extractor" : "FILENAME"
         },
         {
-            "name": "filename",
-            "file": "([^/]+)\\.SAFE/",
-            "format": "%s.zip",
-            "extractor" : "FILENAME"
+            "name": "fileName",
+            "extractor": "SAFE_NAME"
+        },
+        {
+            "name": "fileSize",
+            "extractor": "SAFE_SIZE"
         },
         {
             "name": "productURI",
-            "file": "([^/]+)\\.SAFE/",
-            "format": "SENTINEL-1/%s.zip",
-            "extractor" : "FILENAME"
+            "format": "SENTINEL-1/%s",
+            "extractor": "SAFE_NAME"
         }
     ],
     "index": {

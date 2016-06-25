@@ -29,7 +29,7 @@
 
 import re
 from functools import wraps
-from zipfile import ZipFile
+from util.zipfile import ZipFile
 from .exceptions import FileNotFound
 from .xpath import extract_xpath
 
@@ -49,7 +49,7 @@ def zip_file(func):
 
 
 @zip_file
-def extract_metadata(fobj, schema):
+def extract_metadata(fobj, schema, name=None, size=None):
     """ Extract metadata from safe object. """
     # group the fields by file the regular expressions
     files = {}
@@ -85,8 +85,12 @@ def extract_metadata(fobj, schema):
     # extract the actual metadata
     results = {}
     for (file_name, extractor), fields in extractors.items():
-        if extractor == 'NONE': # no-op place holder 
+        if extractor == 'NONE': # no-op place holder
             continue
+        if extractor == 'SAFE_NAME': # the actual SAFE file-name
+            results[field_def['name']] = field_def.get('format', "%s") % name
+        if extractor == 'SAFE_SIZE': # the actual SAFE file-size
+            results[field_def['name']] = field_def.get('format', "%s") % size
         if extractor == 'FILENAME': # fill fields from filenames
             for field_def in fields:
                 match = re.match(field_def['file'], file_name)
