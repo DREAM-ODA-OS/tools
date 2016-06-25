@@ -26,6 +26,8 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
+from sys import stderr
+
 class ChunkReader(object):
     """ Base chunk reader class. """
     DEFAULT_CHUNK_SIZE = 1048576 # 1MB default chunk size
@@ -43,7 +45,7 @@ class ChunkReader(object):
 
     def load_chunks(self, chunk_list):
         """ Multi-chunk loader. """
-        #print "load_chunks(%s)" % (chunk_list)
+        #print >>stderr, "load_chunks(%s)" % (chunk_list)
 
         def _group_to_ranges_(chunk_list):
             """ Group sorted list of chunks to ranges. """
@@ -64,7 +66,7 @@ class ChunkReader(object):
             byte_size = max(0, min(
                 self._size, (start + count) * self._chunk_size
             ) - byte_offset)
-            print "get_chunk(%s, %s)" % (byte_offset, byte_size)
+            #print >>stderr, "get_chunk(%s, %s)" % (byte_offset, byte_size)
             if byte_size > 0:
                 data = self.get_chunk(byte_offset, byte_size)
             else:
@@ -75,7 +77,7 @@ class ChunkReader(object):
 
     def merge_chunks(self, start, stop):
         """ Merge range of chunks to a single block. """
-        #print "merge_chunks(%s, %s)" % (start, stop)
+        #print >>stderr, "merge_chunks(%s, %s)" % (start, stop)
         chunk_range = range(start, stop)
         missing_chunks = set(chunk_range) - set(self._chunks)
         if missing_chunks:
@@ -84,30 +86,30 @@ class ChunkReader(object):
 
     def read(self, size=None):
         """ Read at most size bytes. """
-        #print "read(%s)" % size
-        #print "start position: %s" % self._position
-        #print "file size:      %s" % self._size
+        #print >>stderr, "read(%s)" % size
+        #print >>stderr, "start position: %s" % self._position
+        #print >>stderr, "file size:      %s" % self._size
         start = max(0, self._position)
         stop = self._size if size is None else min(self._size, start + size)
         size = stop - start
-        #print "_read(%s, %s)" % (start, size)
+        #print >>stderr, "_read(%s, %s)" % (start, size)
         if size > 0:
             offset = start % self._chunk_size
-            #print "chunk local offset:", offset
+            #print >>stderr, "chunk local offset:", offset
             data = self.merge_chunks(
                 start // self._chunk_size, 1 + (stop - 1) // self._chunk_size
             )
-            #print "chunk aligned data size", len(data)
+            #print >>stderr, "chunk aligned data size", len(data)
             data = data[offset:offset+size]
         else:
             data = ""
         self._position += len(data)
-        #print "end position: %s (%+d)" % (self._position, len(data))
+        #print >>stderr, "end position: %s (%+d)" % (self._position, len(data))
         return data
 
     def seek(self, offset, whence=None):
         """ Seek the file position. """
-        #print "seek(%s, %s)" % (offset, whence)
+        #print >>stderr, "seek(%s, %s)" % (offset, whence)
         if whence is None or whence == 0:
             self._position = offset
         elif whence == 1:

@@ -26,6 +26,7 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
+from sys import stderr
 import re
 from swiftclient.exceptions import ClientException
 from .chunk_reader import ChunkReader
@@ -45,6 +46,7 @@ class SWIFTChunkReader(ChunkReader):
         if resp_headers['accept-ranges'] != "bytes":
             raise ClientException("Server does not accept byte ranges!")
         super(SWIFTChunkReader, self).__init__(size, chunk_size)
+        self.headers = resp_headers
 
     def refresh(self):
         """ Refresh the object size. """
@@ -60,8 +62,8 @@ class SWIFTChunkReader(ChunkReader):
             self._object_name,
             headers={'range': 'bytes=%d-%d' % (offset, offset + size -1)}
         )
-        print 'content-length: ', resp_headers['content-length']
-        print 'content-range: ', resp_headers['content-range']
+        #print >>stderr, 'content-length: ', resp_headers['content-length']
+        #print >>stderr, 'content-range: ', resp_headers['content-range']
 
         # check the response
         size_mismatch = (

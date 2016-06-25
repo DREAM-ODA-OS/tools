@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #-------------------------------------------------------------------------------
 #
-# Safe file metadata extraction
+#  Index file output
 #
 # Author: Martin Paces <martin.paces@eox.at>
 #
@@ -27,38 +27,27 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
-import sys
-from sys import stderr, stdout
-import json
-from os.path import basename
-from safe import extract_metadata
-from safe.index import write_metadata
-from util.cli import error
+from sys import stdout
 
-def usage():
-    """ Print short command usage. """
-    exename = basename(sys.argv[0])
-    print >>stderr, "USAGE: %s <md-schema> <safe-file>" % exename
-    print >>stderr, ""
-    print >>stderr, (
-        "This command extracts SAFE file metadata defined by the schema and "
-        "writes them to the standard output as one index file line."
-    )
+def write_metadata(fields, schema, fout=stdout):
+    """ Write meta-data as one index file line. """
+    # pylint: disable=redefined-outer-name
+    delimiter = schema.get('index', {}).get('delimiter', '\t')
+    line_end = schema.get('index', {}).get('eol', '\n')
+    fout.write(delimiter.join(
+        fields.get(field) or '' for field in (
+            field_def['name'] for field_def in schema['fields']
+        )
+    ))
+    fout.write(line_end)
 
-if __name__ == "__main__":
-    # pylint: disable=invalid-name
-    try:
-        schema = sys.argv[1]
-        input_ = sys.argv[2]
-    except IndexError:
-        error("Not enough input arguments.")
-        usage()
-        sys.exit(1)
 
-    # load JSON schema
-    with open(schema) as fobj:
-        schema = json.load(fobj)
-
-    # extract and print metadata
-    with open(input_) as fobj:
-        write_metadata(extract_metadata(fobj, schema), schema)
+def write_header(schema, fout=stdout):
+    """ Write an index file header. """
+    # pylint: disable=redefined-outer-name
+    delimiter = schema.get('index', {}).get('delimiter', '\t')
+    line_end = schema.get('index', {}).get('eol', '\n')
+    fout.write(delimiter.join(
+        field_def['name'] for field_def in schema['fields']
+    ))
+    fout.write(line_end)

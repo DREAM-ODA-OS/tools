@@ -41,7 +41,6 @@ RE_ISO8601_VALID = re.compile(
 
 def _match_attributes(elm, attribs):
     """ Match the element attributes. """
-    print elm
     for key, value in attribs.items():
         if elm.get(key) != value:
             return False
@@ -51,13 +50,17 @@ def _match_attributes(elm, attribs):
 def _text(xml, xpath, attribs):
     """ Extract element text easily. """
     for elm in xml.findall(xpath):
-        print elm
         if _match_attributes(elm, attribs):
-            print elm, elm.text
             return elm.text
     else:
         return None
 
+def _list(xml, xpath, attribs):
+    """ Extract text of all matched elements. """
+    return [
+        elm.text for elm in xml.findall(xpath)
+        if _match_attributes(elm, attribs)
+    ]
 
 def fix_datetime(value):
     """ Fix ISO-8601 date-time string. """
@@ -87,10 +90,20 @@ def extract_xpath(fobj, name, fields):
     results = {}
     # extract fields
     for field_def in fields:
-        value = _text(
-            xml, field_def['xpath'], field_def.get('attributes', {})
-        )
-        filter_ = TYPE[field_def.get('type', 'STRING')]
-        results[field_def['name']] = filter_(value)
+        type_ = field_def.get('type', 'STRING')
+        if type_.startswith("LIST_"):
+            filter_ = TYPE[type_[5:]]
+            value = ", ".join(
+                filter_(value) for value
+                in  _list(
+                    xml, field_def['xpath'], field_def.get('attributes', {})
+                )
+            )
+        else:
+            filter_ = TYPE[type_]
+            value = filter_(_text(
+                xml, field_def['xpath'], field_def.get('attributes', {})
+            ))
+        results[field_def['name']] = value
 
     return results

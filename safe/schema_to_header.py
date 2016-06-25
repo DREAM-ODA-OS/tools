@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #-------------------------------------------------------------------------------
 #
-# Safe file metadata extraction
+# Extract index file header from the SAFE header.
 #
 # Author: Martin Paces <martin.paces@eox.at>
 #
@@ -31,25 +31,24 @@ import sys
 from sys import stderr, stdout
 import json
 from os.path import basename
-from safe import extract_metadata
-from safe.index import write_metadata
+from safe.index import write_header
 from util.cli import error
 
 def usage():
     """ Print short command usage. """
     exename = basename(sys.argv[0])
-    print >>stderr, "USAGE: %s <md-schema> <safe-file>" % exename
+    print >>stderr, "USAGE: %s <md-schema>" % exename
     print >>stderr, ""
     print >>stderr, (
-        "This command extracts SAFE file metadata defined by the schema and "
-        "writes them to the standard output as one index file line."
+        "This command writes an index file header line to the standard "
+        "output. The header is defined by the provided metadata schema."
     )
+
 
 if __name__ == "__main__":
     # pylint: disable=invalid-name
     try:
         schema = sys.argv[1]
-        input_ = sys.argv[2]
     except IndexError:
         error("Not enough input arguments.")
         usage()
@@ -57,8 +56,4 @@ if __name__ == "__main__":
 
     # load JSON schema
     with open(schema) as fobj:
-        schema = json.load(fobj)
-
-    # extract and print metadata
-    with open(input_) as fobj:
-        write_metadata(extract_metadata(fobj, schema), schema)
+        write_header(json.load(fobj))

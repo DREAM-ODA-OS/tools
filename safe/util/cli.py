@@ -1,7 +1,6 @@
-#!/usr/bin/env python
 #-------------------------------------------------------------------------------
 #
-# Extract index file header from the SAFE header.
+#  Shared CLI utilities
 #
 # Author: Martin Paces <martin.paces@eox.at>
 #
@@ -27,44 +26,8 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
-import sys
-from sys import stderr, stdout
-import json
-from os.path import basename
+from sys import stderr
 
 def error(message, *arg):
     """ Print error message. """
     print >>stderr, "ERROR: %s" % (message % arg)
-
-def usage():
-    """ Print short command usage. """
-    exename = basename(sys.argv[0])
-    print >>stderr, "USAGE: %s <md-schema>" % exename
-    print >>stderr, ""
-    print >>stderr, "Dump the index file header from the meta-data schema."
-
-
-def print_header(schema):
-    """ Metadata output. """
-    # pylint: disable=redefined-outer-name
-    delimiter = schema.get('index', {}).get('delimiter', '\t')
-    line_end = schema.get('index', {}).get('eol', '\n')
-    stdout.write(delimiter.join(
-        field_def['name'] for field_def in schema['fields']
-    ))
-    stdout.write(line_end)
-
-
-if __name__ == "__main__":
-    # pylint: disable=invalid-name
-    try:
-        schema = sys.argv[1]
-    except IndexError:
-        error("Not enough input arguments.")
-        usage()
-        sys.exit(1)
-
-    # load JSON schema
-    with open(schema) as fobj:
-        print_header(json.load(fobj))
-
