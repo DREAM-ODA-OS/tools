@@ -28,17 +28,17 @@
 #-------------------------------------------------------------------------------
 
 import sys
-from sys import stderr, stdout
+from sys import stderr
 import json
 from os.path import basename
 from contextlib import closing
 import requests
 from swiftclient.client import Connection
 from swiftclient.exceptions import ClientException
-from util.swift_chunk_reader import SWIFTChunkReader
 from safe import extract_metadata
 from safe.index import write_metadata
 from util.cli import error
+from util.swift_chunk_reader import SWIFTChunkReader
 
 # Disables SSL warnings
 requests.packages.urllib3.disable_warnings()
@@ -94,6 +94,7 @@ if __name__ == "__main__":
         # make sure that the object has the required attributes
         if fobj.headers["content-type"] != "application/zip":
             error("Unexpected content type! %r", fobj.headers["content-type"])
+            sys.exit(1)
 
         # extract and print meta-data
         write_metadata(extract_metadata(fobj, schema), schema)

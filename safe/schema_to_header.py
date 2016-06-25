@@ -28,7 +28,7 @@
 #-------------------------------------------------------------------------------
 
 import sys
-from sys import stderr, stdout
+from sys import stderr
 import json
 from os.path import basename
 from safe.index import write_header
