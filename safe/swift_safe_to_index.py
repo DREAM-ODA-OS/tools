@@ -100,8 +100,8 @@ if __name__ == "__main__":
         # extract and print meta-data
         try:
             write_metadata(extract_metadata(
-                fobj, schema, name=object_name,
-                size=int(fobj.headers['content-length'])
+                fobj, schema, safe_name=object_name,
+                safe_size=int(fobj.headers['content-length'])
             ), schema)
         except Exception as exc:
             error("Failed to process object! %r", object_name)

@@ -66,5 +66,6 @@ if __name__ == "__main__":
             input_ = input_[:-1]
         with open(input_) as fobj:
             write_metadata(extract_metadata(
-                fobj, schema, name=basename(path), size=getsize(path)
+                fobj, schema, safe_name=basename(input_),
+                safe_size=getsize(input_)
             ), schema)

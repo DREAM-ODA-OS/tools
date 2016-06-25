@@ -49,7 +49,7 @@ def zip_file(func):
 
 
 @zip_file
-def extract_metadata(fobj, schema, name=None, size=None):
+def extract_metadata(fobj, schema, safe_name=None, safe_size=None):
     """ Extract metadata from safe object. """
     # group the fields by file the regular expressions
     files = {}
@@ -85,13 +85,17 @@ def extract_metadata(fobj, schema, name=None, size=None):
     # extract the actual metadata
     results = {}
     for (file_name, extractor), fields in extractors.items():
-        if extractor == 'NONE': # no-op place holder
-            continue
-        if extractor == 'SAFE_NAME': # the actual SAFE file-name
-            results[field_def['name']] = field_def.get('format', "%s") % name
-        if extractor == 'SAFE_SIZE': # the actual SAFE file-size
-            results[field_def['name']] = field_def.get('format', "%s") % size
-        if extractor == 'FILENAME': # fill fields from filenames
+        if extractor == 'NONE':
+            pass # no-op place holder
+        elif extractor == 'SAFE_NAME': # the actual SAFE file-name
+            for field_def in fields:
+                format_ = field_def.get('format', "%s")
+                results[field_def['name']] = format_ % safe_name
+        elif extractor == 'SAFE_SIZE': # the actual SAFE file-size
+            for field_def in fields:
+                format_ = field_def.get('format', "%s")
+                results[field_def['name']] = format_ % safe_size
+        elif extractor == 'FILENAME': # fill fields from filenames
             for field_def in fields:
                 match = re.match(field_def['file'], file_name)
                 tmp = match.groups()[0] if match.groups() else file_name
@@ -102,7 +106,6 @@ def extract_metadata(fobj, schema, name=None, size=None):
         else:
             with fobj.open(file_name) as ftmp:
                 results.update(EXTRACTORS[extractor](ftmp, file_name, fields))
-
 
     return results
 
