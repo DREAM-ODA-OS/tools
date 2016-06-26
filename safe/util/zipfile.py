@@ -1063,7 +1063,8 @@ class ZipFile(object):
             # filter illegal characters on Windows
             illegal = ':<>|"?*'
             if isinstance(arcname, unicode):
-                table = {ord(c): ord('_') for c in illegal}
+                #table = {ord(c): ord('_') for c in illegal}
+                table = dict((ord(c), ord('_')) for c in illegal)
             else:
                 table = string.maketrans(illegal, '_' * len(illegal))
             arcname = arcname.translate(table)
@@ -1084,9 +1085,12 @@ class ZipFile(object):
                 os.mkdir(targetpath)
             return targetpath
 
-        with self.open(member, pwd=pwd) as source, \
-             file(targetpath, "wb") as target:
-            shutil.copyfileobj(source, target)
+        #with self.open(member, pwd=pwd) as source, \
+        #     file(targetpath, "wb") as target:
+        #    shutil.copyfileobj(source, target)
+        with self.open(member, pwd=pwd) as source:
+            with file(targetpath, "wb") as target:
+                shutil.copyfileobj(source, target)
 
         return targetpath
 
