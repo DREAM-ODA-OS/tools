@@ -1,7 +1,7 @@
 {
     "fields": [ 
         {
-            "name": "platformShorName",
+            "name": "platformShortName",
             "file": "[^/]+/manifest.safe",
             "extractor": "XPATH",
             "type": "STRING",
