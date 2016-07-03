@@ -1,0 +1,130 @@
+{
+    "fields": [ 
+        {
+            "name": "platformShortName",
+            "file": "[^/]+/manifest.safe",
+            "extractor": "XPATH",
+            "type": "STRING",
+            "xpath" : "//{http://www.esa.int/safe/sentinel-1.0}platform/{http://www.esa.int/safe/sentinel-1.0}familyName"
+        },
+        {
+            "name": "platformSerialIdentifier",
+            "file": "[^/]+/manifest.safe",
+            "extractor" : "XPATH",
+            "type": "STRING",
+            "xpath" : "//{http://www.esa.int/safe/sentinel-1.0}platform/{http://www.esa.int/safe/sentinel-1.0}number"
+        },
+        {
+            "name": "instrumentShortName",
+            "extractor" : "CONSTANT",
+            "value" : "SAR-C"
+        },
+        {
+            "name": "sensorType",
+            "extractor" : "CONSTANT",
+            "value" : "RADAR"
+        },
+        {
+            "name": "operationalMode",
+            "file": "[^/]+/manifest.safe",
+            "extractor" : "XPATH",
+            "type": "STRING",
+            "xpath": "//{http://www.esa.int/safe/sentinel-1.0}platform/{http://www.esa.int/safe/sentinel-1.0}instrument/{http://www.esa.int/safe/sentinel-1.0}extension/{http://www.esa.int/safe/sentinel-1.0/sentinel-1/sar}instrumentMode/{http://www.esa.int/safe/sentinel-1.0/sentinel-1/sar}mode"
+        },
+        {
+            "name": "swathIdentifier",
+            "extractor" : "CONSTANT",
+            "value" : "UNDEFINED"
+        },
+        {
+            "name": "orbitNumber",
+            "file": "[^/]+/manifest.safe",
+            "extractor" : "XPATH",
+            "type": "STRING",
+            "xpath": "//{http://www.esa.int/safe/sentinel-1.0}orbitReference/{http://www.esa.int/safe/sentinel-1.0}orbitNumber",
+            "attributes" : {"type": "start"}
+        },
+        {
+            "name": "wrsLongitudeGrid",
+            "file": "[^/]+/manifest.safe",
+            "extractor" : "XPATH",
+            "type": "STRING",
+            "xpath": "//{http://www.esa.int/safe/sentinel-1.0}orbitReference/{http://www.esa.int/safe/sentinel-1.0}relativeOrbitNumber",
+            "attributes" : {"type": "start"}
+        },
+        {
+            "name": "orbitDirection",
+            "file": "[^/]+/manifest.safe",
+            "extractor" : "XPATH",
+            "type": "STRING",
+            "xpath": "//{http://www.esa.int/safe/sentinel-1.0}orbitReference/{http://www.esa.int/safe/sentinel-1.0}extension/{http://www.esa.int/safe/sentinel-1.0/sentinel-1}orbitProperties/{http://www.esa.int/safe/sentinel-1.0/sentinel-1}pass"
+        },
+        {
+            "name": "beginAcquisition",
+            "file": "[^/]+/manifest.safe",
+            "extractor" : "XPATH",
+            "type": "DATETIME",
+            "xpath": "//{http://www.esa.int/safe/sentinel-1.0}acquisitionPeriod/{http://www.esa.int/safe/sentinel-1.0}startTime"
+        },
+        {
+            "name": "endAcquisition",
+            "file": "[^/]+/manifest.safe",
+            "extractor" : "XPATH",
+            "type": "DATETIME",
+            "xpath": "//{http://www.esa.int/safe/sentinel-1.0}acquisitionPeriod/{http://www.esa.int/safe/sentinel-1.0}stopTime"
+        },
+        {
+            "name": "startTimeFromAscendingNode",
+            "file": "[^/]+/manifest.safe",
+            "extractor" : "XPATH",
+            "type": "FLOAT2INT",
+            "xpath": "//{http://www.esa.int/safe/sentinel-1.0}acquisitionPeriod/{http://www.esa.int/safe/sentinel-1.0}extension/{http://www.esa.int/safe/sentinel-1.0/sentinel-1}timeANX/{http://www.esa.int/safe/sentinel-1.0/sentinel-1}startTimeANX"
+        },
+        {
+            "name": "completionTimeFromAscendingNode",
+            "file": "[^/]+/manifest.safe",
+            "extractor" : "XPATH",
+            "type": "FLOAT2INT",
+            "xpath": "//{http://www.esa.int/safe/sentinel-1.0}acquisitionPeriod/{http://www.esa.int/safe/sentinel-1.0}extension/{http://www.esa.int/safe/sentinel-1.0/sentinel-1}timeANX/{http://www.esa.int/safe/sentinel-1.0/sentinel-1}stopTimeANX"
+        },
+        {
+            "name": "productType",
+            "extractor" : "CONSTANT",
+            "value" : "RAW"
+        },
+        {
+            "name": "polarisationChannels",
+            "extractor" : "CONSTANT",
+            "value" : "UNDEFINED"
+        },
+        {
+            "name": "footprint",
+            "file": "[^/]+/manifest.safe",
+            "extractor" : "XPATH",
+            "type": "GMLCOORDS",
+            "xpath": "//{http://www.esa.int/safe/sentinel-1.0}frameSet/{http://www.esa.int/safe/sentinel-1.0}frame/{http://www.esa.int/safe/sentinel-1.0}footPrint/{http://www.opengis.net/gml}coordinates"
+        },
+        {
+            "name": "productId",
+            "file": "([^/]+)\\.SAFE/",
+            "extractor" : "FILENAME"
+        },
+        {
+            "name": "fileName",
+            "extractor": "SAFE_NAME"
+        },
+        {
+            "name": "fileSize",
+            "extractor": "SAFE_SIZE"
+        },
+        {
+            "name": "productURI",
+            "format": "SENTINEL-1/%s",
+            "extractor": "SAFE_NAME"
+        }
+    ],
+    "index": {
+        "delimiter": "\t",
+        "eol": "\r\n"
+    }
+}
