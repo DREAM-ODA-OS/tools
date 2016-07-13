@@ -28,7 +28,7 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
-from numpy import zeros, histogram
+from numpy import zeros, histogram, linspace
 
 class Histogram(object):
     """ Multi-band image histogram. """
@@ -49,6 +49,46 @@ class Histogram(object):
             if self.count[idx] > 0:
                 data[idx, :] *= 1.0 / self.count[idx]
         return data
+
+    @property
+    def cumulative_density(self):
+        """ Return cumulative density function (normalised histogram). """
+        return self.density.cumsum(1)
+
+    @property
+    def centres(self):
+        """ Return array of the bin centres. """
+        return linspace(
+            self.vmin - 0.5*self.step, self.vmax + 0.5*self.step, self.nbin + 2
+        )
+
+    def get_range(self, lower_pct, upper_pct):
+        """ Get ranges for the given lower and upper percentiles. """
+        assert lower_pct < 1.0
+        assert upper_pct > 0.0
+
+        ycdf = self.cumulative_density
+        xcnt = self.centres
+        ranges = []
+        for band in xrange(ycdf.shape[0]):
+            if lower_pct > 0:
+                idx = (ycdf[band, :] < lower_pct).nonzero()[0].max()
+                xmin = xcnt[idx] + (
+                    self.step * (lower_pct - ycdf[band, idx]) /
+                    (ycdf[band, idx+1] - ycdf[band, idx])
+                )
+            else:
+                xmin = xcnt[0]
+            if upper_pct < 1:
+                idx = (ycdf[band, :] > upper_pct).nonzero()[0].min()
+                xmax = xcnt[idx + 1] + (
+                    self.step * (ycdf[band, idx] - upper_pct) /
+                    (ycdf[band, idx] - ycdf[band, idx - 1])
+                )
+            else:
+                xmax = xcnt[-1]
+            ranges.append((xmin, xmax))
+        return ranges
 
     def __add__(self, other):
         """ Join two histograms. """
@@ -91,3 +131,59 @@ class Histogram(object):
             print >>fobj, "%g\t%s" % (
                 x_bin, "\t".join("%d" % v for v in self.accum[:, idx])
             )
+
+
+def parse_histogram(fobj):
+    """ Parse histogram file. """
+    # check signature
+    try:
+        if fobj.next().strip() != "# HISTOGRAM":
+            raise ValueError
+    except (StopIteration, ValueError):
+        raise ValueError("Wrong histogram file signature!")
+
+    # parse header
+    line = None
+    header = {}
+    for line in fobj:
+        if line[0] == "#":
+            line = line[1:].strip()
+            key, sep, val = line.partition(":")
+            if sep == ":":
+                header[key.strip()] = val.strip()
+        else:
+            break
+    else:
+        raise ValueError("No data line!")
+
+    try:
+        vmin = float(header['vmin'])
+        vmax = float(header['vmax'])
+        nbin = int(header['nbin'])
+        nband = int(header['nband'])
+        nband = int(header['nband'])
+    except KeyError as exc:
+        raise ValueError("Corrupted histogram header: missing key %s!" % exc)
+    except ValueError as exc:
+        raise ValueError("Corrupted histogram header: %s!" % exc)
+
+    del header['vmin']
+    del header['vmax']
+    del header['nbin']
+    del header['nband']
+    if 'COUNT' in header:
+        del header['COUNT']
+
+    # create new histogram
+    hist = Histogram(nband, vmin, vmax, nbin)
+
+    # parse histogram values
+    hist.accum[:, 0] = [int(v) for v in line.strip().split()[1:]]
+    for idx in xrange(1, nbin + 2):
+        line = fobj.next()
+        hist.accum[:, idx] = [int(v) for v in line.strip().split()[1:]]
+
+    # update counts
+    hist.count[:] = hist.accum.sum(1)
+
+    return hist, header
