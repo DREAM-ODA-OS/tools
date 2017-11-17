@@ -1,9 +1,9 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 #------------------------------------------------------------------------------
-# 
-#   Simplify geometry 
 #
-# Project: Image Processing Tools 
+#   Simplify geometry
+#
+# Project: Image Processing Tools
 # Authors: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
@@ -12,8 +12,8 @@
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
-# copies of the Software, and to permit persons to whom the Software is 
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
 #
 # The above copyright notice and this permission notice shall be included in all
@@ -28,154 +28,173 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
-import sys 
-import os.path 
-import img_geom as ig 
-from osgeo import ogr ; ogr.UseExceptions() 
-from osgeo import osr ; ogr.UseExceptions() 
-#from osgeo import gdal ; gdal.UseExceptions() 
+import sys
+import os.path
+import img_geom as ig
+from osgeo import ogr; ogr.UseExceptions()
+#from osgeo import gdal ; gdal.UseExceptions()
 
 #------------------------------------------------------------------------------
 
-def simplify_polygon( g0 , gslen ): 
-    
-    # NOTE: The Geometry.GetGeometryType() method is not 
-    #       reliable. To get the true geometry type always 
-    #       use string names returned by 
-    #       Geometry.GetGeometryName() method. 
+def simplify_geometry(src_geom, gslen):
+    """ Recursively simplify complex 2D geometry (linear-ring, polygon or
+    multi-polygon).
+    """
+    # NOTE: The Geometry.GetGeometryType() method is not reliable.
+    # To get the true geometry type always use string names returned
+    # by Geometry.GetGeometryName() method.
+
     # -----------------------------------------------
-    if g0.GetGeometryName() == "LINEARRING" :
-        
-        # note simplyfication works on polygons only 
-        pg0 = ogr.Geometry(ogr.wkbPolygon)
-        pg0.AddGeometry( g0 ) 
+    if src_geom.GetGeometryName() == "LINEARRING":
 
-        # simplify lienear ring 
-        pg1 = pg0.Simplify( gslen )
+        # note simplification works on polygons only
+        polygon = ogr.Geometry(ogr.wkbPolygon)
+        polygon.AddGeometry(src_geom)
+        geom_simplified = polygon.Simplify(gslen)
 
-        rl = [] 
-    
+        rings = [] # list of simplified rings
+
         # parse the output and decompose it to linear rings
-        if pg1.IsEmpty() : 
-            pass 
+        if geom_simplified.IsEmpty():
+            pass
 
-        elif pg1.GetGeometryName() == "POLYGON" : 
-            rl.append(pg1.GetGeometryRef(0).Clone()) #clone to avoid segfaults
+        elif geom_simplified.GetGeometryName() == "POLYGON":
+            rings.append(
+                #clone to avoid segfaults
+                geom_simplified.GetGeometryRef(0).Clone()
+            )
 
-        elif pg1.GetGeometryName() == "MULTIPOLYGON" :
-            for i in xrange(pg1.GetGeometryCount()) :
-                p = pg1.GetGeometryRef(1) 
-                rl.append(p.GetGeometryRef(0).Clone()) #clone to avoid segfaults
+        elif geom_simplified.GetGeometryName() == "MULTIPOLYGON":
+            rings.extend(
+                #clone to avoid segfaults
+                geom_simplified.GetGeometryRef(i).GetGeometryRef(0).Clone()
+                for i in xrange(geom_simplified.GetGeometryCount())
+            )
 
-        else : 
-            raise ValueError("Unexpected geometry %s"%(pg1.GetGeometryName())) 
+        else:
+            raise ValueError(
+                "Unexpected simplified geometry type %s! "
+                "Expected POLYGON or MULTIPOLYGON." %
+                geom_simplified.GetGeometryName()
+            )
 
-        return rl
-
-    # -----------------------------------------------
-    elif g0.GetGeometryName() == "POLYGON" :
-    
-        pg = ogr.Geometry(ogr.wkbPolygon)
-
-        for i in xrange(g0.GetGeometryCount()) : 
-
-            g = g0.GetGeometryRef(i)
-    
-            # ignore anything but the linear rings  
-            if g.GetGeometryName() != "LINEARRING" : 
-                continue 
-
-            # simplify linear ring  
-            for lr in simplify_polygon( g, gslen ) : 
-
-                # if non-empty add to polygon 
-                if not lr.IsEmpty() : 
-                    pg.AddGeometry( lr ) 
-
-        return pg
+        return rings
 
     # -----------------------------------------------
-    elif g0.GetGeometryName() == "MULTIPOLYGON" :
-        
-        mp = ogr.Geometry(ogr.wkbMultiPolygon)
+    elif src_geom.GetGeometryName() == "POLYGON":
 
-        for i in xrange(g0.GetGeometryCount()) : 
+        polygon = ogr.Geometry(ogr.wkbPolygon)
 
-            g = g0.GetGeometryRef(i)
-            
-            # ignore anything but the polygons 
-            if g.GetGeometryName() != "POLYGON" : 
-                continue 
+        for i in xrange(src_geom.GetGeometryCount()):
+            ring = src_geom.GetGeometryRef(i)
+            if ring.GetGeometryName() != "LINEARRING":
+                raise ValueError(
+                    "Unexpected geometry type %s! Expected LINEARRING." %
+                    geom_simplified.GetGeometryName()
+                )
+
+            simplified_rings = simplify_geometry(ring, gslen)
+
+            if i == 0: # first ring is the outer ring
+                if len(simplified_rings) > 1:
+                    raise ValueError(
+                        "Polygon outer ring split into multiple polygons!"
+                    )
+
+                elif len(simplified_rings) == 0:
+                    # outer ring got removed -> return empty multi-polygon
+                    return ogr.Geometry(ogr.wkbMultiPolygon)
+
+                else:
+                    polygon.AddGeometry(simplified_rings[0])
+
+            else: # inner rings
+                for ring in simplified_rings:
+                    polygon.AddGeometry(ring)
+
+        return polygon
+
+    # -----------------------------------------------
+    elif src_geom.GetGeometryName() == "MULTIPOLYGON":
+        multi_polygon = ogr.Geometry(ogr.wkbMultiPolygon)
+        for i in xrange(src_geom.GetGeometryCount()):
+            polygon = src_geom.GetGeometryRef(i)
+            if polygon.GetGeometryName() != "POLYGON":
+                raise ValueError(
+                    "Unexpected geometry type %s! Expected POLYGON." %
+                    geom_simplified.GetGeometryName()
+                )
 
             # simplify polygon
-            pg = simplify_polygon( g, gslen ) 
-            
-            # if non-empty add to multi-polygon 
-            if not pg.IsEmpty() : 
-                mp.AddGeometry( pg ) 
+            simplified_polygon = simplify_geometry(polygon, gslen)
 
-        return mp 
-            
+            # if non-empty add to multi-polygon
+            if not simplified_polygon.IsEmpty():
+                multi_polygon.AddGeometry(simplified_polygon)
+
+        return multi_polygon
+
     # -----------------------------------------------
-    else :
+    else:
+        # any other geometry is passed trough unchanged
+        return src_geom
 
-        # ignore anything else 
-        return g0 
-        
 #------------------------------------------------------------------------------
 
-if __name__ == "__main__" : 
+if __name__ == "__main__":
 
-    # TODO: to improve CLI 
+    # TODO: to improve CLI
 
-    EXENAME = os.path.basename( sys.argv[0] ) 
+    EXENAME = os.path.basename(sys.argv[0])
 
-    DEBUG=False 
-    FORMAT="WKB"
+    DEBUG = False
+    FORMAT = "WKB"
 
-    try: 
+    try:
 
         INPUT = sys.argv[1]
-        GSLEN = float( sys.argv[2] ) # geometry simplification parameter
-        NP = 2 
-        if len(sys.argv) > NP : 
-            for arg in sys.argv[NP:] : 
-                if ( arg in ig.OUTPUT_FORMATS ) : FORMAT=arg # output format
-                elif ( arg == "DEBUG" ) : DEBUG = True # dump debuging output
+        GSLEN = float(sys.argv[2]) # geometry simplification parameter
+        NP = 2
+        if len(sys.argv) > NP:
+            for arg in sys.argv[NP:]:
+                if arg in ig.OUTPUT_FORMATS:
+                    FORMAT = arg # output format
+                elif arg == "DEBUG":
+                    DEBUG = True # dump debuging output
 
-    except IndexError : 
-        
-        sys.stderr.write("ERROR: Not enough input arguments!\n") 
-        sys.stderr.write("\nSimplify geometry and dump new geometry to stdout\n") 
-        sys.stderr.write("by default in WKB format.\n\n") 
-        sys.stderr.write("USAGE: %s <WKB|WKB> <prm.simpl.> [WKT|WKB] [DEBUG]\n"%EXENAME) 
-        sys.exit(1) 
+    except IndexError:
 
-    #--------------------------------------------------------------------------
-    # import 
-
-    # open input geometry file 
-    fin = sys.stdin if INPUT == "-" else open(INPUT) 
-
-    # read the data 
-    try: 
-        geom = ig.parseGeom( fin.read() , DEBUG ) 
-    except Exception as e : 
-        print >>sys.stderr, "ERROR: %s: %s"%(EXENAME,e)
+        sys.stderr.write("ERROR: Not enough input arguments!\n")
+        sys.stderr.write("\nSimplify geometry and dump new geometry to stdout\n")
+        sys.stderr.write("by default in WKB format.\n\n")
+        sys.stderr.write("USAGE: %s <WKB|WKB> <prm.simpl.> [WKT|WKB] [DEBUG]\n"%EXENAME)
         sys.exit(1)
 
     #--------------------------------------------------------------------------
-    # simplify geometry 
+    # import
 
-    geom = ig.setSR(simplify_polygon(geom,GSLEN),geom.GetSpatialReference())
+    # open input geometry file
+    fin = sys.stdin if INPUT == "-" else open(INPUT)
+
+    # read the data
+    try:
+        geom = ig.parseGeom(fin.read(), DEBUG)
+    except Exception as exc:
+        print >>sys.stderr, "ERROR: %s: %s" % (EXENAME, exc)
+        sys.exit(1)
 
     #--------------------------------------------------------------------------
-    # export 
+    # simplify geometry
 
-    try: 
+    geom = ig.setSR(simplify_geometry(geom, GSLEN), geom.GetSpatialReference())
 
-        sys.stdout.write(ig.dumpGeom(geom,FORMAT)) 
+    #--------------------------------------------------------------------------
+    # export
 
-    except Exception as e : 
-        print >>sys.stderr, "ERROR: %s: %s"%(EXENAME,e)
+    try:
+
+        sys.stdout.write(ig.dumpGeom(geom, FORMAT))
+
+    except Exception as exc:
+        print >>sys.stderr, "ERROR: %s: %s" % (EXENAME, exc)
         sys.exit(1)
