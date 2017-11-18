@@ -8,8 +8,7 @@
 #   For blurring is made by the (separated) Gaussian convolution filter
 #   The value of the threshold controls position of the new mask border.
 #
-# Project: Image Processing Tools
-# Authors: Martin Paces <martin.paces@eox.at>
+# Author: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
 # Copyright (C) 2013 EOX IT Services GmbH

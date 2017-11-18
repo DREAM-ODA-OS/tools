@@ -5,8 +5,7 @@
 #   offset of the upper-left corner and row/column size of extracted
 #   block. The tool takes care of preserving the geocoding.
 #
-# Project: Image Processing Tools
-# Authors: Martin Paces <martin.paces@eox.at>
+# Author: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
 # Copyright (C) 2013 EOX IT Services GmbH

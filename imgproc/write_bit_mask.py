@@ -4,8 +4,7 @@
 #   This tool writes a single bit-mask plane (from a 'byte' mask) to a bit-flag
 #   image.
 #
-# Project: Image Processing Tools
-# Authors: Martin Paces <martin.paces@eox.at>
+# Author: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
 # Copyright (C) 2013 EOX IT Services GmbH

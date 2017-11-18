@@ -4,7 +4,6 @@
 #  Guess resolution of the warped image using the same method
 #  as the one used by GDAL warp (length from the top-left to bottom-right edge).
 #
-# Project: Image Processing Tools
 # Author: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------

@@ -6,8 +6,7 @@
 #   The output will be always produced in  GeoTIFF (or TIFF if no geo-coding
 #   available) format.
 #
-# Project: Image Processing Tools
-# Authors: Martin Paces <martin.paces@eox.at>
+# Author: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
 # Copyright (C) 2013 EOX IT Services GmbH

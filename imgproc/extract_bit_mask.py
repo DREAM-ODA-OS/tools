@@ -4,8 +4,7 @@
 #   This tool extracts a single bit-mask plane (as a 'byte' mask) from
 #   a bit-flag image.
 #
-# Project: Image Processing Tools
-# Authors: Martin Paces <martin.paces@eox.at>
+# Author: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
 # Copyright (C) 2013 EOX IT Services GmbH
