@@ -3,8 +3,7 @@
 #
 #   rasterize geometry
 #
-# Project: Image Processing Tools
-# Authors: Martin Paces <martin.paces@eox.at>
+# Author: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
 # Copyright (C) 2013 EOX IT Services GmbH
@@ -27,6 +26,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
+#pylint: disable=invalid-name, wrong-import-position
 
 import sys
 from sys import stderr

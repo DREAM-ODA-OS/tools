@@ -3,8 +3,7 @@
 #
 #   Extract extent of a raster image as a rectange polygon.
 #
-# Project: Image Processing Tools
-# Authors: Martin Paces <martin.paces@eox.at>
+# Author: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
 # Copyright (C) 2013 EOX IT Services GmbH
@@ -27,13 +26,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
-#pylint: disable=invalid-name
+#pylint: disable=invalid-name, wrong-import-position
 
 import sys
 import os.path
-from osgeo import ogr ; ogr.UseExceptions() #pylint: disable=multiple-statements
-from osgeo import osr ; ogr.UseExceptions() #pylint: disable=multiple-statements
-from osgeo import gdal ; gdal.UseExceptions() #pylint: disable=multiple-statements
+from osgeo import ogr; ogr.UseExceptions() #pylint: disable=multiple-statements
+from osgeo import osr; ogr.UseExceptions() #pylint: disable=multiple-statements
+from osgeo import gdal; gdal.UseExceptions() #pylint: disable=multiple-statements
 from img import ImageFileReader
 import img_geom as ig
 

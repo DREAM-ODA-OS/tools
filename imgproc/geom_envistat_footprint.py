@@ -5,15 +5,16 @@
 import sys
 import traceback
 import os.path
-from osgeo import gdal; gdal.UseExceptions()
-from osgeo import ogr; ogr.UseExceptions()
-#from osgeo import osr; ogr.UseExceptions()
+from osgeo import gdal; gdal.UseExceptions() #pylint: disable=multiple-statements
+from osgeo import ogr; ogr.UseExceptions() #pylint: disable=multiple-statements
 import img_geom as ig
 
 WGS84_SR = ig.parseSR("EPSG:4326")
 
+
 def usage():
-    sys.stderr.write("USAGE: %s <.N1> [WKT|WKB] [DEBUG]\n")
+    print >>sys.stderr, "USAGE: %s <.N1> [WKT|WKB] [DEBUG]"
+
 
 if __name__ == "__main__":
     # TODO: to improve CLI
@@ -32,12 +33,12 @@ if __name__ == "__main__":
                     DEBUG = True # dump debuging output
 
     except IndexError:
-        sys.stderr.write("ERROR: %s: Not enough input arguments!\n"%EXENAME)
+        print >>sys.stderr, "ERROR: %s: Not enough input arguments!" % EXENAME
         usage()
         sys.exit(1)
 
-    except Exception, e:
-        sys.stderr.write("ERROR: %s: %s\n"%(EXENAME, e))
+    except Exception, exc:
+        print >>sys.stderr, "ERROR: %s: %s" % (EXENAME, exc)
         usage()
         sys.exit(1)
 
@@ -84,8 +85,8 @@ if __name__ == "__main__":
         # export
         sys.stdout.write(ig.dumpGeom(geom, FORMAT))
 
-    except Exception as e:
+    except Exception as exc:
         if DEBUG:
             traceback.print_exc(file=sys.stderr)
-        print >>sys.stderr, "ERROR: %s: %s"%(EXENAME, e)
+        print >>sys.stderr, "ERROR: %s: %s"%(EXENAME, exc)
         sys.exit(1)

@@ -3,8 +3,7 @@
 #
 #   Extract geometry outline from a raster image.
 #
-# Project: Image Processing Tools
-# Authors: Martin Paces <martin.paces@eox.at>
+# Author: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
 # Copyright (C) 2013 EOX IT Services GmbH
@@ -27,6 +26,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
+#pylint: disable=wrong-import-position
+
 # TODO: merge with extract_mask_footprint.py
 
 import sys
@@ -38,6 +39,7 @@ from img import ImageFileReader
 from img.cli import error
 from img_geom import OUTPUT_FORMATS, setSR, dumpGeom
 from img_vectorize import vectorize
+
 
 def usage():
     """ Print simple usage help. """
@@ -51,6 +53,7 @@ def usage():
         )
     for line in _gen_():
         print >>sys.stderr, line
+
 
 FILTERS = {
     (True, True): lambda v: VALUE & v == VALUE,

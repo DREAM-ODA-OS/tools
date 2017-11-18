@@ -3,8 +3,7 @@
 #
 #   Print geometry extent (envelope).
 #
-# Project: Image Processing Tools
-# Authors: Martin Paces <martin.paces@eox.at>
+# Author: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
 # Copyright (C) 2014 EOX IT Services GmbH
@@ -27,13 +26,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
+# pylint: disable=invalid-name
 
 import sys
 import os.path
 import img_geom as ig
-from osgeo import ogr; ogr.UseExceptions()
-#from osgeo import osr; ogr.UseExceptions()
-#from osgeo import gdal; gdal.UseExceptions()
+from osgeo import ogr; ogr.UseExceptions() #pylint: disable=multiple-statements
+
 
 if __name__ == "__main__":
     # TODO: to improve CLI
@@ -49,11 +48,11 @@ if __name__ == "__main__":
                     DEBUG = True # dump debuging output
 
     except IndexError:
-        sys.stderr.write("ERROR: Not enough input arguments!\n")
-        sys.stderr.write("\nDump geometry extent:\n")
-        sys.stderr.write("    <x_min>, <y_min>, <x_max>, <y_max>\n")
-        sys.stderr.write(" and its spatial reference.\n")
-        sys.stderr.write("USAGE: %s <WKT|WKB> [DEBUG]\n"%EXENAME)
+        print >>sys.stderr, "ERROR: Not enough input arguments!"
+        print >>sys.stderr, "\nDump geometry extent:"
+        print >>sys.stderr, "    <x_min>, <y_min>, <x_max>, <y_max>"
+        print >>sys.stderr, " and its spatial reference."
+        print >>sys.stderr, "USAGE: %s <WKT|WKB> [DEBUG]" % EXENAME
         sys.exit(1)
 
     try:
@@ -61,14 +60,14 @@ if __name__ == "__main__":
         fin = sys.stdin if INPUT == "-" else open(INPUT)
         geom = ig.parseGeom(fin.read(), DEBUG)
 
-        sr = geom.GetSpatialReference()
-        env = geom.GetEnvelope()
+        sref = geom.GetSpatialReference()
+        envelope = geom.GetEnvelope()
 
-        print "%s%.6g,%.6g,%.6g,%.6g"%(
-            ig.dumpSR(sr, ";"), env[0], env[2], env[1], env[3]
+        print "%s%.6g,%.6g,%.6g,%.6g" % (
+            ig.dumpSR(sref, ";"), envelope[0], envelope[2], envelope[1],
+            envelope[3]
         )
 
-    except Exception as e:
-        print >>sys.stderr, "ERROR: %s: %s"%(EXENAME, e)
+    except Exception as exc:
+        print >>sys.stderr, "ERROR: %s: %s" % (EXENAME, exc)
         sys.exit(1)
-

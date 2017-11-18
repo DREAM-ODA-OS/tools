@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 #------------------------------------------------------------------------------
 #
-#   Extract geometry outline from a raster image.
+#   Extract geometry from a feature collection.
 #
-# Project: Image Processing Tools
-# Authors: Martin Paces <martin.paces@eox.at>
+# Author: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
 # Copyright (C) 2013 EOX IT Services GmbH
@@ -27,16 +26,18 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
-#pylint: disable=invalid-name
+#pylint: disable=wrong-import-position, invalid-name
+
 import sys
-import os.path
-from osgeo import ogr; ogr.UseExceptions()
-from osgeo import gdal; gdal.UseExceptions()
+from os.path import basename
+from osgeo import ogr; ogr.UseExceptions() #pylint: disable=multiple-statements
+from osgeo import gdal; gdal.UseExceptions() #pylint: disable=multiple-statements
 import img_geom as ig
+
 
 if __name__ == "__main__":
     # TODO: to improve CLI
-    EXENAME = os.path.basename(sys.argv[0])
+    EXENAME = basename(sys.argv[0])
     DEBUG = False
     FORMAT = "WKB"
     OPERATOR = "EQL"
@@ -54,109 +55,97 @@ if __name__ == "__main__":
                 elif arg == "DEBUG":
                     DEBUG = True # dump debuging output
     except IndexError:
-        sys.stderr.write("ERROR: Not enough input arguments!\n")
-        sys.stderr.write("\nExtract extract feature geometry.\n")
-        sys.stderr.write("USAGE: %s <input image> <data-value> [WKT|WKB*] [ALL|AND|EQL*] [DEBUG]\n"%EXENAME)
+        print >>sys.stderr, "ERROR: Not enough input arguments!"
+        print >>sys.stderr, "\nExtract geometry from a feature collection."
+        print >>sys.stderr, (
+            "USAGE: %s <feature-collection> <data-value> [WKT|WKB*] "
+            "[ALL|AND|EQL*] [DEBUG]" % EXENAME
+        )
         sys.exit(1)
 
-    #--------------------------------------------------------------------------
-
-
-    ds = ogr.Open(INPUT)
-
-    ly = ds.GetLayer(0)
-
-    sr = ly.GetSpatialRef()
-
-    if sr is not None: sr.AutoIdentifyEPSG()
-
-    #--------------------------------------------------------------------------
-
-    # run the extract vector outlines
-    # NOTE: The polygons are already in the projected coordinates!
-#    res = gdal.Polygonize(ds.GetRasterBand(1), None, ly, 0)
+    dataset = ogr.Open(INPUT)
+    layer = dataset.GetLayer(0)
+    sref = layer.GetSpatialRef()
+    if sref is not None:
+        sref.AutoIdentifyEPSG()
 
     # get list of features
-    lf = [ly.GetFeature(i) for i in xrange(ly.GetFeatureCount())]
+    features = [layer.GetFeature(idx) for idx in xrange(layer.GetFeatureCount())]
 
     if DEBUG:
-        print >>sys.stderr, "Number of features: ", ly.GetFeatureCount()
-        for i, f in enumerate(lf):
-            print >>sys.stderr, "#%2.2i\t%s\tDN=%d"%(i, str(f), f.GetFieldAsInteger(0))
+        print >>sys.stderr, "Number of features: ", len(features)
+        for idx, feature in enumerate(features):
+            print >>sys.stderr, "#%2.2i\t%s\tDN=%d" % (
+                idx, str(feature), feature.GetFieldAsInteger(0)
+            )
 
     # extract features matching the selection criteria
     if OPERATOR == "EQL": # (V == DN)
-        _filter = lambda f: (VALUE == f.GetFieldAsInteger(0))
+        predicate = lambda f: VALUE == f.GetFieldAsInteger(0)
     elif OPERATOR == "AND": # (0 != (V&DN))
-        _filter = lambda f: (0 != (VALUE&f.GetFieldAsInteger(0)))
+        predicate = lambda f: (VALUE & f.GetFieldAsInteger(0)) != 0
     elif OPERATOR == "ALL": # (0 != (V&DN))
-        _filter = lambda f: True
+        predicate = lambda f: True
     else:
         raise RuntimeError("Invalid operator! OPERATOR=%s"%OPERATOR)
 
-    lf = filter(_filter, lf)
-    del _filter
+    features = [feature for feature in features if predicate]
 
     if DEBUG:
-        print >>sys.stderr, "Number of filtered features: ", len(lf)
-        for i, f in enumerate(lf):
-            print >>sys.stderr, "#%2.2i\t%s\tDN=%d"%(i, str(f), f.GetFieldAsInteger(0))
+        print >>sys.stderr, "Number of filtered features: ", len(features)
+        for idx, feature in enumerate(features):
+            print >>sys.stderr, "#%2.2i\t%s\tDN=%d" % (
+                idx, str(feature), feature.GetFieldAsInteger(0)
+            )
 
-    # collect set of matched digital numbers
-    dn_set = set()
-    for f in lf:
-        dn_set.add(f.GetFieldAsInteger(0))
+    # collect unique list of matched digital numbers
+    dn_set = set(feature.GetFieldAsInteger(0) for feature in features)
 
     # extract geometries
-    lg = map(lambda f: f.GetGeometryRef(), lf)
+    geometries = [feature.GetGeometryRef() for feature in features]
 
     if DEBUG:
-        print >>sys.stderr, "Number of initial geometries: ", len(lf)
-        for i, g in enumerate(lg):
-            print >>sys.stderr, "#%2.2i\t"%i, g.GetGeometryType(), g.GetGeometryName(), g.Area()
+        print >>sys.stderr, "Number of initial geometries: ", len(geometries)
+        for idx, geometry in enumerate(geometries):
+            print >>sys.stderr, "#%2.2i\t%s\t%s\t%s" % (
+                idx, geometry.GetGeometryType(), geometry.GetGeometryName(),
+                geometry.Area()
+            )
 
     # remove empty geometries
-    lg = filter(lambda g: not g.IsEmpty(), lg)
+    geometries = [geometry for geometry in geometries if not geometry.IsEmpty()]
 
     if DEBUG:
-        print >>sys.stderr, "Number of simplified non-empty geometries: ", len(lf)
-        for i, g in enumerate(lg):
-            print >>sys.stderr, "#%2.2i\t"%i, g.GetGeometryType(), g.GetGeometryName(), g.Area()
+        print >>sys.stderr, "Number of non-empty geometries: ", len(geometries)
+        for idx, geometry in enumerate(geometries):
+            print >>sys.stderr, "#%2.2i\t%s\t%s\t%s" % (
+                idx, geometry.GetGeometryType(), geometry.GetGeometryName(),
+                geometry.Area()
+            )
 
-    # NOTE: no geometry optiomisations performed
+    # NOTE: no geometry optimisations performed
 
-    #--------------------------------------------------------------------------
-    # pack the individual geometries
+    # merge the individual geometries
+    # NOTE: We assume that all geometries are polygons which can be joined
+    # to a multi-polygon.
 
-    # NOTE: At this point we assume that all geometries are polygons
-    #       and thus they can be joined to a multi-polygon.
-
-    if len(lg) > 1: # mutiple polygons
-
-        geom = ig.groupPolygons(lg)
-
-        # perform union if mutiple DN matched
-        if len(dn_set) > 0:
+    if len(geometries) > 1: # multiple polygons
+        geom = ig.groupPolygons(geometries)
+        if len(dn_set) > 0: # perform union if multiple DN matched
             geom = geom.UnionCascaded()
 
-    elif len(lg) == 1: # single polygon
+    elif len(geometries) == 1: # single polygon
+        geom, = geometries
 
-        geom = lg[0]
-
-    else: # no match -> empty polygon
-
-        geom = ogr.Geometry(ogr.wkbPolygon)
+    else: # no match -> empty multi-polygon
+        geom = ogr.Geometry(ogr.wkbMultiPolygon)
 
     # assign spatial reference
-    geom.AssignSpatialReference(sr)
+    geom.AssignSpatialReference(sref)
 
-    #--------------------------------------------------------------------------
     # export
-
     try:
-
         sys.stdout.write(ig.dumpGeom(geom, FORMAT))
-
-    except Exception as e:
-        print >>sys.stderr, "ERROR: %s: %s"%(EXENAME, e)
+    except Exception as exc:
+        print >>sys.stderr, "ERROR: %s: %s" % (EXENAME, exc)
         sys.exit(1)

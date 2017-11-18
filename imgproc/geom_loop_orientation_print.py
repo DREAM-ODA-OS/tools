@@ -3,8 +3,7 @@
 #
 #   Print geometry extent
 #
-# Project: Image Processing Tools
-# Authors: Martin Paces <martin.paces@eox.at>
+# Author: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
 # Copyright (C) 2013 EOX IT Services GmbH
@@ -27,21 +26,24 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
+# pylint: disable=invalid-name
 
 import sys
 import os.path
 import img_geom as ig
-from osgeo import ogr; ogr.UseExceptions()
-#from osgeo import osr; ogr.UseExceptions()
-#from osgeo import gdal; gdal.UseExceptions()
+from osgeo import ogr; ogr.UseExceptions() #pylint: disable=multiple-statements
 
-def dump_winding(geom, level=0, inner_loop=False):
-    gname = geom.GetGeometryName()
-    if gname == "LINEARRING":
+
+def dump_winding(geometry, level=0, inner_loop=False):
+    """ For a given Geometry print winding of the linear rings."""
+    # pylint: disable=invalid-name
+
+    geometry_name = geometry.GetGeometryName()
+    if geometry_name == "LINEARRING":
         area = 0.0
-        for i in xrange(geom.GetPointCount()-1):
-            x0, y0 = geom.GetPoint_2D(i)
-            x1, y1 = geom.GetPoint_2D(i+1)
+        for i in xrange(geometry.GetPointCount()-1):
+            x0, y0 = geometry.GetPoint_2D(i)
+            x1, y1 = geometry.GetPoint_2D(i+1)
             area += x0*y1 - x1*y0
         if area < 0:
             result = "CW"
@@ -51,19 +53,21 @@ def dump_winding(geom, level=0, inner_loop=False):
             result = "0"
         else:
             result = "INVALID"
-        print "%s%s(%s) %s"%("  "*level, gname, ("O", "I")[inner_loop], result)
+        print "%s%s(%s) %s" % (
+            "  "*level, geometry_name, ("O", "I")[inner_loop], result
+        )
 
-    elif gname == "POLYGON":
-        print "  "*level, gname
+    elif geometry_name == "POLYGON":
+        print "  "*level, geometry_name
         inner_loop = False
-        for i in xrange(geom.GetGeometryCount()):
-            dump_winding(geom.GetGeometryRef(i), level+1, inner_loop)
+        for i in xrange(geometry.GetGeometryCount()):
+            dump_winding(geometry.GetGeometryRef(i), level+1, inner_loop)
             inner_loop = True
 
-    elif gname in ("MULTIPOLYGON", "GEOMETRYCOLLECTION"):
-        print "  "*level, gname
-        for i in xrange(geom.GetGeometryCount()):
-            dump_winding(geom.GetGeometryRef(i), level+1)
+    elif geometry_name in ("MULTIPOLYGON", "GEOMETRYCOLLECTION"):
+        print "  "*level, geometry_name
+        for i in xrange(geometry.GetGeometryCount()):
+            dump_winding(geometry.GetGeometryRef(i), level+1)
 
 
 if __name__ == "__main__":
@@ -80,9 +84,9 @@ if __name__ == "__main__":
                     DEBUG = True # dump debuging output
 
     except IndexError:
-        sys.stderr.write("ERROR: Not enough input arguments!\n")
-        sys.stderr.write("\nPrint linear ring orientation.\n")
-        sys.stderr.write("USAGE: %s <WKT|WKB> [DEBUG]\n"%EXENAME)
+        print >>sys.stderr, "ERROR: Not enough input arguments!"
+        print >>sys.stderr, "\nPrint linear ring orientation."
+        print >>sys.stderr, "USAGE: %s <WKT|WKB> [DEBUG]" % EXENAME
         sys.exit(1)
 
     try:
@@ -92,6 +96,6 @@ if __name__ == "__main__":
 
         dump_winding(geom)
 
-    except Exception as e:
-        print >>sys.stderr, "ERROR: %s: %s"%(EXENAME, e)
+    except Exception as exc:
+        print >>sys.stderr, "ERROR: %s: %s"%(EXENAME, exc)
         sys.exit(1)

@@ -3,8 +3,7 @@
 #
 #   Coordinate transformation.
 #
-# Project: Image Processing Tools
-# Authors: Martin Paces <martin.paces@eox.at>
+# Author: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
 # Copyright (C) 2013 EOX IT Services GmbH
@@ -27,25 +26,28 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
+#pylint: disable=invalid-name
 
 import sys
 import traceback
 import os.path
 import img_geom as ig
-from osgeo import ogr ; ogr.UseExceptions()
-#from osgeo import osr ; ogr.UseExceptions()
-#from osgeo import gdal ; gdal.UseExceptions()
+from osgeo import ogr; ogr.UseExceptions() # pylint: disable=multiple-statements
+
 
 WGS84_SR = ig.parseSR("EPSG:4326")
 
+
 def usage():
-    sys.stderr.write("\nConvert the input geometry to the WGS84 coordinates\n")
-    sys.stderr.write("including the north/south pole handling for polar \n")
-    sys.stderr.write("projections and the date-line wraparround for geometries\n")
-    sys.stderr.write("crossing the date-line.\n")
-    sys.stderr.write("The result is dumped as a new geometry to stdout\n")
-    sys.stderr.write("by default in WKB format.\n")
-    sys.stderr.write("USAGE: %s <WKB|WKB> [WKT|WKB] [DEBUG]\n")
+    """ print usage """
+    print >>sys.stderr, "\nConvert the input geometry to the WGS84 coordinates"
+    print >>sys.stderr, "including the north/south pole handling for polar"
+    print >>sys.stderr, "projections and the date-line wraparround for geometries"
+    print >>sys.stderr, "crossing the date-line."
+    print >>sys.stderr, "The result is dumped as a new geometry to stdout"
+    print >>sys.stderr, "by default in WKB format."
+    print >>sys.stderr, "USAGE: %s <WKB|WKB> [WKT|WKB] [DEBUG]"
+
 
 if __name__ == "__main__":
     # TODO: to improve CLI
@@ -64,33 +66,26 @@ if __name__ == "__main__":
                     DEBUG = True # dump debuging output
 
     except IndexError:
-        sys.stderr.write("ERROR: %s: Not enough input arguments!\n"%EXENAME)
+        print >>sys.stderr, "ERROR: %s: Not enough input arguments!" % EXENAME
         usage()
         sys.exit(1)
 
-    except Exception, e:
-        sys.stderr.write("ERROR: %s: %s\n"%(EXENAME, e))
+    except Exception as exc:
+        print >>sys.stderr, "ERROR: %s: %s" % (EXENAME, exc)
         usage()
         sys.exit(1)
 
-    #--------------------------------------------------------------------------
-    # import
-
-    # open input geometry file
+    # open and read the input geometry file
     fin = sys.stdin if INPUT == "-" else open(INPUT)
-
-    # read the data
     try:
         geom = ig.parseGeom(fin.read(), DEBUG)
-    except Exception as e:
+    except Exception as exc:
         if DEBUG:
             traceback.print_exc(file=sys.stderr)
-        print >>sys.stderr, "ERROR: %s: %s"%(EXENAME, e)
+        print >>sys.stderr, "ERROR: %s: %s" % (EXENAME, exc)
         sys.exit(1)
 
-    #--------------------------------------------------------------------------
     # project geometry
-
     SOURCE_SR = geom.GetSpatialReference()
 
     # assing the default spatial reference (WGS84)
@@ -100,13 +95,11 @@ if __name__ == "__main__":
     # process the coordinates
     geom = ig.mapToWGS84(geom)
 
-    #--------------------------------------------------------------------------
     # export
-
     try:
         sys.stdout.write(ig.dumpGeom(geom, FORMAT))
-    except Exception as e:
+    except Exception as exc:
         if DEBUG:
             traceback.print_exc(file=sys.stderr)
-        print >>sys.stderr, "ERROR: %s: %s"%(EXENAME, e)
+        print >>sys.stderr, "ERROR: %s: %s" % (EXENAME, exc)
         sys.exit(1)

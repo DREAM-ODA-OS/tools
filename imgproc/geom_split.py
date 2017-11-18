@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 #------------------------------------------------------------------------------
 #
-#  suggest splitting of the geometry to smaller blocks
+#  Suggest splitting of the geometry to smaller rectangular blocks
 #
 #
-# Project: Image Processing Tools
 # Author: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
@@ -28,12 +27,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
+#pylint: disable=wrong-import-position,invalid-name
 
-import math as m
 import sys
-import os.path
-from osgeo import ogr ; ogr.UseExceptions()
-#from osgeo import osr ; osr.UseExceptions()
+from math import ceil, floor
+from os.path import basename
+from osgeo import ogr; ogr.UseExceptions() # pylint: disable=multiple-statements
 import img_geom as ig
 
 # bounds of well known coordinate systems
@@ -43,81 +42,84 @@ KNOWN_BOUNDS = {
     "EPSG:4326": (-180., -90., +180., +90.),
 }
 
-def separate(geom):
-    """ separate polygons with non-overlapping envelopes """
+def separate(geometry):
+    """ Separate polygons with non-overlapping envelopes. """
 
-    def overlap(e0, e1):
+    def overlap(envelope0, envelope1):
         """ check if envelopes overlap """
-        return ((e0[0] <= e1[1]) and (e0[1] >= e1[0])
-            and (e0[2] <= e1[3]) and (e0[3] >= e1[2]))
+        return (
+            (envelope0[0] <= envelope1[1]) and (envelope0[1] >= envelope1[0]) and
+            (envelope0[2] <= envelope1[3]) and (envelope0[3] >= envelope1[2])
+        )
 
-
-    if geom.GetGeometryName() != 'MULTIPOLYGON':
-        return [geom]
+    if geometry.GetGeometryName() != 'MULTIPOLYGON':
+        return [geometry]
 
     groups = []
-    geoms = ig.ungroupMultiPolygon(geom)
-    envls = [g.GetEnvelope() for g in geoms]
-    idx_src = set(i for i in xrange(len(geoms)))
+    geometries = ig.ungroupMultiPolygon(geometry)
+    envelopes = [item.GetEnvelope() for item in geometries]
+    idx_src = set(i for i in xrange(len(geometries)))
 
     while idx_src:
         idx = idx_src.pop()
-        for g in groups: # find
-            if idx in g:
-                group = g
-                groups.remove(g)
+        for item in groups: # find
+            if idx in item:
+                group = item
+                groups.remove(item)
                 break
         else:
             group = set()
             group.add(idx)
 
         for idy in idx_src:
-            if overlap(envls[idx], envls[idy]):
+            if overlap(envelopes[idx], envelopes[idy]):
                 group.add(idy)
         groups.append(group)
 
 
-    final_geoms = []
+    final_geometries = []
     for group in groups:
         if len(group) == 1:
-            final_geoms.append(geoms[group.pop()].Clone())
+            final_geometries.append(geometries[group.pop()].Clone())
         else:
-            final_geoms.append(ig.setSR(
-                ig.groupPolygons([geoms[i].Clone() for i in group]),
-                geom.GetSpatialReference()
+            final_geometries.append(ig.setSR(
+                ig.groupPolygons([geometries[i].Clone() for i in group]),
+                geometry.GetSpatialReference()
             ))
 
-    return final_geoms
+    return final_geometries
 
 
-def split(geom, (dx_max, dy_max), (rx, ry), (bx0, by0, bx1, by1)):
+def split(geometry, (dx_max, dy_max), (rx, ry), (bx0, by0, bx1, by1)):
+    """ Cut geometry to smaller blocks. """
+    #pylint: disable=invalid-name
 
     def _get_sizes(v0, v1, dv_max, rv, bv0, bv1):
         if rv > 0:
             dv_max *= rv
         if rv > 0:
-            vr0 = vr1 = 0.5*(rv*m.ceil((v1-v0)/rv) - (v1-v0))
+            vr0 = vr1 = 0.5*(rv*ceil((v1-v0)/rv) - (v1-v0))
             if bv1 < (v1 + vr1):
                 v1 = bv1
-                vr0 = rv*m.ceil((v1-v0)/rv) - (v1-v0)
+                vr0 = rv*ceil((v1-v0)/rv) - (v1-v0)
                 vr1 = 0
             if bv0 > (v0 - vr0):
                 v0 = bv0
                 vr0 = 0
-                vr1 = rv*m.ceil((v1-v0)/rv) - (v1-v0)
+                vr1 = rv*ceil((v1-v0)/rv) - (v1-v0)
             v0 -= vr0
             v1 += vr1
-        nv = int(m.ceil((v1 - v0) / dv_max))
+        nv = int(ceil((v1 - v0) / dv_max))
         dv = (v1 - v0) / nv
         return v0, v1, dv, nv
 
     def _round(v0, v1, v_ref, rv):
         if rv > 0:
-            v0 = v_ref + rv*m.floor((v0 - v_ref)/rv)
-            v1 = v_ref + rv*m.ceil((v1 - v_ref)/rv)
+            v0 = v_ref + rv*floor((v0 - v_ref)/rv)
+            v1 = v_ref + rv*ceil((v1 - v_ref)/rv)
         return v0, v1
 
-    x0, x1, y0, y1 = geom.GetEnvelope()
+    x0, x1, y0, y1 = geometry.GetEnvelope()
     x0, x1, dx, nx = _get_sizes(x0, x1, dx_max, rx, bx0, bx1)
     y0, y1, dy, ny = _get_sizes(y0, y1, dy_max, ry, by0, by1)
 
@@ -127,7 +129,7 @@ def split(geom, (dx_max, dy_max), (rx, ry), (bx0, by0, bx1, by1)):
         for iy in xrange(ny):
             yy0 = y0 + iy*dy
             yy1 = yy0 + dy
-            gg = geom.Intersection(ig.getRectangle((xx0, yy0, xx1, yy1)))
+            gg = geometry.Intersection(ig.getRectangle((xx0, yy0, xx1, yy1)))
             if gg.IsEmpty():
                 continue
             xxx0, xxx1, yyy0, yyy1 = gg.GetEnvelope()
@@ -137,7 +139,7 @@ def split(geom, (dx_max, dy_max), (rx, ry), (bx0, by0, bx1, by1)):
 
 
 if __name__ == "__main__":
-    EXENAME = os.path.basename(sys.argv[0])
+    EXENAME = basename(sys.argv[0])
     BUFFER = 0
     DEBUG = False
     USE_STDIN = False
@@ -167,8 +169,11 @@ if __name__ == "__main__":
             RES_Y = RES_X
 
     except IndexError:
-        sys.stderr.write("Not enough input arguments!\n")
-        sys.stderr.write("USAGE: %s <WKT footprint> <max_x_size> <max_y_size> [<res_x> <res_y>]\n"%EXENAME)
+        print >>sys.stderr, "Not enough input arguments!"
+        print >>sys.stderr, (
+            "USAGE: %s <WKT footprint> <max_x_size> <max_y_size> "
+            "[<res_x> <res_y>]" % EXENAME
+        )
         sys.exit(1)
 
     if MAX_X_SIZE <= 0 or MAX_Y_SIZE <= 0:
@@ -181,35 +186,26 @@ if __name__ == "__main__":
     # pixel resolution (optional, set to 0 if not used)
     res = (RES_X, RES_Y)
 
-    #--------------------------------------------------------------------------
-    # load geomery
 
-    # open input geometry file
+    # open and read the input geometry file
     fin = sys.stdin if INPUT == "-" else open(INPUT)
-
-    # read the data
     try:
         geom = ig.parseGeom(fin.read(), DEBUG)
-    except Exception as e:
-        print >>sys.stderr, "ERROR: %s: %s"%(EXENAME, e)
+    except Exception as exc:
+        print >>sys.stderr, "ERROR: %s: %s" % (EXENAME, exc)
         sys.exit(1)
 
-    #--------------------------------------------------------------------------
-    # checking spatial reference
-    # NOTE: Spatial reference is required
-
+    # checking presence of the mandatory spatial reference
     sr = geom.GetSpatialReference()
     if sr is None:
-        print >>sys.stderr, "ERROR: %s: The geometry has no projection!"%(EXENAME)
+        print >>sys.stderr, "ERROR: %s: The geometry has no projection!" % EXENAME
         sys.exit(1)
 
     # projection bounds
     bounds = KNOWN_BOUNDS.get(ig.dumpSR(sr), DEFAULT_BOUNDS)
 
-    #--------------------------------------------------------------------------
     # split geometry to clusters with non-overlapping envelope
     # and cut them to smaller blocks
-
     for geom in separate(geom):
         for rect in split(geom, max_size, res, bounds):
-            print "%.16g %.16g %.16g %.16g"%rect
+            print "%.16g %.16g %.16g %.16g" % rect

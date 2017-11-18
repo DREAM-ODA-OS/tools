@@ -1,10 +1,9 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 #------------------------------------------------------------------------------
-# 
-#   buffer geometry 
 #
-# Project: Image Processing Tools 
-# Authors: Martin Paces <martin.paces@eox.at>
+#   buffer geometry
+#
+# Author: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
 # Copyright (C) 2013 EOX IT Services GmbH
@@ -12,8 +11,8 @@
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
-# copies of the Software, and to permit persons to whom the Software is 
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
 #
 # The above copyright notice and this permission notice shall be included in all
@@ -28,69 +27,54 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
-import sys 
-import os.path 
-import img_geom as ig 
-from osgeo import ogr ; ogr.UseExceptions() 
-from osgeo import osr ; ogr.UseExceptions() 
-#from osgeo import gdal ; gdal.UseExceptions() 
+import sys
+import os.path
+import img_geom as ig
+from osgeo import ogr; ogr.UseExceptions() #pylint: disable=multiple-statements
 
-#------------------------------------------------------------------------------
 
-if __name__ == "__main__" : 
+if __name__ == "__main__":
 
-    # TODO: to improve CLI 
+    # TODO: to improve CLI
 
-    EXENAME = os.path.basename( sys.argv[0] ) 
+    EXENAME = os.path.basename(sys.argv[0])
+    DEBUG = False
+    FORMAT = "WKB"
 
-    DEBUG=False 
-    FORMAT="WKB"
-
-    try: 
-
+    try:
         INPUT = sys.argv[1]
-        BFLEN = float( sys.argv[2] ) # geometry simplification parameter
-        NP = 2 
-        if len(sys.argv) > NP : 
-            for arg in sys.argv[NP:] : 
-                if ( arg in ig.OUTPUT_FORMATS ) : FORMAT=arg # output format
-                elif ( arg == "DEBUG" ) : DEBUG = True # dump debuging output
+        BFLEN = float(sys.argv[2]) # geometry simplification parameter
+        NP = 2
+        if len(sys.argv) > NP:
+            for arg in sys.argv[NP:]:
+                if arg in ig.OUTPUT_FORMATS:
+                    FORMAT = arg # output format
+                elif arg == "DEBUG":
+                    DEBUG = True # dump debugging output
 
-    except IndexError : 
-        
-        sys.stderr.write("ERROR: Not enough input arguments!\n") 
-        sys.stderr.write("\nBuffer geometry and dump new geometry to stdout\n") 
-        sys.stderr.write("by default in WKB format.\n\n") 
-        sys.stderr.write("USAGE: %s <WKB|WKB> <prm.sgm.> [WKT|WKB] [DEBUG]\n"%EXENAME) 
-        sys.exit(1) 
-
-    #--------------------------------------------------------------------------
-    # import 
-
-    # open input geometry file 
-    fin = sys.stdin if INPUT == "-" else open(INPUT) 
-
-    # read the data 
-    try: 
-        geom = ig.parseGeom( fin.read() , DEBUG ) 
-    except Exception as e : 
-        print >>sys.stderr, "ERROR: %s: %s"%(EXENAME,e)
+    except IndexError:
+        sys.stderr.write("ERROR: Not enough input arguments!\n")
+        sys.stderr.write("\nBuffer geometry and dump new geometry to stdout\n")
+        sys.stderr.write("by default in WKB format.\n\n")
+        sys.stderr.write("USAGE: %s <WKB|WKB> <prm.sgm.> [WKT|WKB] [DEBUG]\n"%EXENAME)
         sys.exit(1)
 
-    #--------------------------------------------------------------------------
-    # simplify geometry 
+    # open input geometry file
+    fin = sys.stdin if INPUT == "-" else open(INPUT)
 
-    geom = ig.setSR( geom.Buffer( BFLEN ), geom.GetSpatialReference() )
-
-    #--------------------------------------------------------------------------
-    # export 
-
-    try: 
-
-        sys.stdout.write(ig.dumpGeom(geom,FORMAT)) 
-
-    except Exception as e : 
-        print >>sys.stderr, "ERROR: %s: %s"%(EXENAME,e)
+    # read the data
+    try:
+        geom = ig.parseGeom(fin.read(), DEBUG)
+    except Exception as exc:
+        print >>sys.stderr, "ERROR: %s: %s" % (EXENAME, exc)
         sys.exit(1)
 
+    # create the buffer
+    geom = ig.setSR(geom.Buffer(BFLEN), geom.GetSpatialReference())
 
+    # export
+    try:
+        sys.stdout.write(ig.dumpGeom(geom, FORMAT))
+    except Exception as exc:
+        print >>sys.stderr, "ERROR: %s: %s" % (EXENAME, exc)
+        sys.exit(1)

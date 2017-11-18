@@ -3,8 +3,7 @@
 #
 #   Simplify geometry
 #
-# Project: Image Processing Tools
-# Authors: Martin Paces <martin.paces@eox.at>
+# Author: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
 # Copyright (C) 2013 EOX IT Services GmbH
@@ -27,14 +26,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
+#pylint: disable=invalid-name
 
 import sys
 import os.path
 import img_geom as ig
-from osgeo import ogr; ogr.UseExceptions()
-#from osgeo import gdal ; gdal.UseExceptions()
+from osgeo import ogr; ogr.UseExceptions() # pylint: disable=multiple-statements
 
-#------------------------------------------------------------------------------
 
 def simplify_geometry(src_geom, gslen):
     """ Recursively simplify complex 2D geometry (linear-ring, polygon or
@@ -44,7 +42,6 @@ def simplify_geometry(src_geom, gslen):
     # To get the true geometry type always use string names returned
     # by Geometry.GetGeometryName() method.
 
-    # -----------------------------------------------
     if src_geom.GetGeometryName() == "LINEARRING":
 
         # note simplification works on polygons only
@@ -80,7 +77,6 @@ def simplify_geometry(src_geom, gslen):
 
         return rings
 
-    # -----------------------------------------------
     elif src_geom.GetGeometryName() == "POLYGON":
 
         polygon = ogr.Geometry(ogr.wkbPolygon)
@@ -114,7 +110,6 @@ def simplify_geometry(src_geom, gslen):
 
         return polygon
 
-    # -----------------------------------------------
     elif src_geom.GetGeometryName() == "MULTIPOLYGON":
         multi_polygon = ogr.Geometry(ogr.wkbMultiPolygon)
         for i in xrange(src_geom.GetGeometryCount()):
@@ -134,24 +129,18 @@ def simplify_geometry(src_geom, gslen):
 
         return multi_polygon
 
-    # -----------------------------------------------
     else:
         # any other geometry is passed trough unchanged
         return src_geom
 
-#------------------------------------------------------------------------------
 
 if __name__ == "__main__":
-
     # TODO: to improve CLI
-
     EXENAME = os.path.basename(sys.argv[0])
-
     DEBUG = False
     FORMAT = "WKB"
 
     try:
-
         INPUT = sys.argv[1]
         GSLEN = float(sys.argv[2]) # geometry simplification parameter
         NP = 2
@@ -163,38 +152,26 @@ if __name__ == "__main__":
                     DEBUG = True # dump debuging output
 
     except IndexError:
-
-        sys.stderr.write("ERROR: Not enough input arguments!\n")
-        sys.stderr.write("\nSimplify geometry and dump new geometry to stdout\n")
-        sys.stderr.write("by default in WKB format.\n\n")
-        sys.stderr.write("USAGE: %s <WKB|WKB> <prm.simpl.> [WKT|WKB] [DEBUG]\n"%EXENAME)
+        print >>sys.stderr, "ERROR: Not enough input arguments!"
+        print >>sys.stderr, "\nSimplify geometry and dump new geometry to stdout"
+        print >>sys.stderr, "by default in WKB format.\n"
+        print >>sys.stderr, "USAGE: %s <WKB|WKB> <prm.simpl.> [WKT|WKB] [DEBUG]" % EXENAME
         sys.exit(1)
 
-    #--------------------------------------------------------------------------
-    # import
-
-    # open input geometry file
+    # open and read input geometry file
     fin = sys.stdin if INPUT == "-" else open(INPUT)
-
-    # read the data
     try:
         geom = ig.parseGeom(fin.read(), DEBUG)
     except Exception as exc:
         print >>sys.stderr, "ERROR: %s: %s" % (EXENAME, exc)
         sys.exit(1)
 
-    #--------------------------------------------------------------------------
     # simplify geometry
-
     geom = ig.setSR(simplify_geometry(geom, GSLEN), geom.GetSpatialReference())
 
-    #--------------------------------------------------------------------------
     # export
-
     try:
-
         sys.stdout.write(ig.dumpGeom(geom, FORMAT))
-
     except Exception as exc:
         print >>sys.stderr, "ERROR: %s: %s" % (EXENAME, exc)
         sys.exit(1)

@@ -1,10 +1,9 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 #------------------------------------------------------------------------------
-# 
+#
 #  perform intersection of a list of geometries
 #
-# Project: Image Processing Tools 
-# Authors: Martin Paces <martin.paces@eox.at>
+# Author: Martin Paces <martin.paces@eox.at>
 #
 #-------------------------------------------------------------------------------
 # Copyright (C) 2013 EOX IT Services GmbH
@@ -12,8 +11,8 @@
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
-# copies of the Software, and to permit persons to whom the Software is 
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
 #
 # The above copyright notice and this permission notice shall be included in all
@@ -27,81 +26,68 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
+# pylint: disable=invalid-name
 
-import sys 
-import os.path 
-import img_geom as ig 
-from osgeo import ogr ; ogr.UseExceptions() 
-from osgeo import osr ; ogr.UseExceptions() 
-#from osgeo import gdal ; gdal.UseExceptions() 
+import sys
+import os.path
+import img_geom as ig
+from osgeo import ogr; ogr.UseExceptions() #pylint: disable=multiple-statements
 
-#------------------------------------------------------------------------------
 
-if __name__ == "__main__" : 
+if __name__ == "__main__":
+    # TODO: to improve CLI
+    EXENAME = os.path.basename(sys.argv[0])
+    DEBUG = False
+    FORMAT = "WKB"
+    HELP = False
+    INPUTS = []
 
-    # TODO: to improve CLI 
+    for arg in sys.argv[1:]:
+        # handle reserved keywords
+        if arg in ("WKT", "WKB", "JSON", "KML", "DEBUG", "HELP"):
+            if arg in ig.OUTPUT_FORMATS:
+                FORMAT = arg # output format
+            elif arg == "DEBUG":
+                DEBUG = True # dump debugging output
+            elif arg == "HELP":
+                HELP = True # print help on usage and exit
+            continue
 
-    EXENAME = os.path.basename( sys.argv[0] ) 
+        INPUTS.append(arg)
 
-    DEBUG=False 
-    FORMAT="WKB"
-    HELP=False
-    INPUTS=[]  
+    if HELP or (len(sys.argv) == 1):
+        print >>sys.stderr, "\nIntersect muptiple geometries and dump new geometry to stdout"
+        print >>sys.stderr, "by default in WKB format.\n"
+        print >>sys.stderr, "USAGE: %s <WKB|WKB> ... [WKT|WKB] [HELP] [DEBUG]" % EXENAME
+        sys.exit(1)
 
-    for arg in sys.argv[1:] : 
+    # start with an empty polygon
+    geom = None
+    sref = None
+    for i, INPUT in enumerate(INPUTS):
+        if DEBUG:
+            print >>sys.stderr, "#%d\t%s" % (i, INPUT)
 
-        # reserved keywords 
-        if arg in ( "WKT", "WKB", "JSON", "KML", "DEBUG" , "HELP" ) : 
-            if ( arg in ig.OUTPUT_FORMATS ) : FORMAT=arg # output format
-            elif ( arg == "DEBUG" ) : DEBUG = True # dump debuging output
-            elif ( arg == "HELP" ) : HELP = True # print help on useage and exit 
-            continue 
-
-        INPUTS.append( arg ) 
-
-    if HELP or ( len(sys.argv) == 1 ) :
-        
-        sys.stderr.write("\nIntersect muptiple geometries and dump new geometry to stdout\n") 
-        sys.stderr.write("by default in WKB format.\n\n") 
-        sys.stderr.write("USAGE: %s <WKB|WKB> ... [WKT|WKB] [HELP] [DEBUG]\n"%EXENAME) 
-        sys.exit(1) 
-
-    #--------------------------------------------------------------------------
-
-    # start with an empty polygon 
-    geom = None 
-    sr = None 
-
-    for i,INPUT in enumerate(INPUTS) : 
-    
-        if DEBUG : print >>sys.stderr, "#%d\t%s"%(i,INPUT) 
-
-        # open input geometry file 
-        fin = sys.stdin if INPUT == "-" else open(INPUT) 
-
-        # read the data 
-        try: 
-            gsrc = ig.parseGeom( fin.read() , DEBUG ) 
-        except Exception as e : 
-            print >>sys.stderr, "ERROR: %s: %s"%(EXENAME,e)
+        # open and read  input geometry file
+        fin = sys.stdin if INPUT == "-" else open(INPUT)
+        try:
+            gsrc = ig.parseGeom(fin.read(), DEBUG)
+        except Exception as exc:
+            print >>sys.stderr, "ERROR: %s: %s" % (EXENAME, exc)
             sys.exit(1)
-        
-        if ( sr is None ) and ( gsrc.GetSpatialReference() is not None ) : 
-            sr = gsrc.GetSpatialReference().Clone() 
-        
-        # intersect geometries 
-        geom = gsrc if ( geom is None ) else geom.Intersection( gsrc ) 
 
-    # assign spatial reference 
-    geom.AssignSpatialReference( sr ) 
+        if (sref is None) and (gsrc.GetSpatialReference() is not None):
+            sref = gsrc.GetSpatialReference().Clone()
 
-    #--------------------------------------------------------------------------
-    # export 
+        # intersect geometries
+        geom = gsrc if (geom is None) else geom.Intersection(gsrc)
 
-    try: 
+    # assign spatial reference
+    geom.AssignSpatialReference(sref)
 
-        sys.stdout.write(ig.dumpGeom(geom,FORMAT)) 
-
-    except Exception as e : 
-        print >>sys.stderr, "ERROR: %s: %s"%(EXENAME,e)
+    # export
+    try:
+        sys.stdout.write(ig.dumpGeom(geom, FORMAT))
+    except Exception as exc:
+        print >>sys.stderr, "ERROR: %s: %s" % (EXENAME, exc)
         sys.exit(1)
